@@ -1,9 +1,29 @@
 import './App.css'
 import Track from './components/Track'
+import { useContext } from 'react'
+import { GameContext } from './context/GameContext'
+import BongoCat from './components/BongoCat';
 
 function App() {
+  const { gameState, startGame } = useContext(GameContext);
+
   return (
     <div className="fixed inset-0 w-screen h-screen bg-[#E9967A] overflow-hidden">
+      <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-white z-20 ${
+        gameState.connectionStatus === 'connected' ? 'bg-green-500' :
+        gameState.connectionStatus === 'connecting' ? 'bg-yellow-500' :
+        'bg-red-500'
+      }`}>
+        WS: {gameState.connectionStatus}
+      </div>
+
+      <button
+        onClick={startGame}
+        className="absolute top-4 left-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 z-20"
+      >
+        Start Game
+      </button>
+
       <div className="relative w-full h-screen bg-[#E9967A]">
         <div
           className="absolute w-full h-1.5 bg-black z-10"
@@ -19,12 +39,7 @@ function App() {
               Using responsive width classes (e.g. 30vw) so that the cat scales with the window.
               You can adjust this value (30vw) to achieve your desired size.
             */}
-            <img 
-              src="/bongo_00.png" 
-              style={{ width: `1000px` }}
-              className="max-w-[400px]" 
-              alt="Bongo cat" 
-            />
+            <BongoCat />
           </div>
         </div>
       </div>

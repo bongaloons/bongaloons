@@ -116,4 +116,9 @@ async def get_game_status():
         "status": "running",
         "elapsed_time": current_time,
         "total_duration": GAME_STATE["game_duration"]
-    } 
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "ok"} 
