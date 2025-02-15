@@ -116,3 +116,5 @@ celerybeat.pid
 Thumbs.db
 
 requirements.txt
+
+/data
