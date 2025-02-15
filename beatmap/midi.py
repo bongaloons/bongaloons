@@ -7,6 +7,7 @@ pitch_to_move = {67: "left", 72: "right"}
 
 @dataclass
 class Note:
+    move_type: str
     start: float
     duration: float
     subdivision: int  # e.g. 4 for quarter, 8 for eighth, etc.
@@ -76,7 +77,7 @@ def parse_midi(midi_path: str) -> Dict[str, List[Note]]:
             start = note.start
             duration = note.end - note.start
             subdivision = get_note_subdivision(duration, bpm)
-            note_obj = Note(start=start, duration=duration, subdivision=subdivision)
+            note_obj = Note(move_type=move, start=start, duration=duration, subdivision=subdivision)
             
             if move not in notes_by_move:
                 notes_by_move[move] = []

@@ -43,8 +43,8 @@ async def start_game(midi_file: str = "test.mid"):
         "falling_dots": [
             {
                 "move": move,
-                "target_time": note.start,
-                "track": move
+                "target_time": note.start * 1000,
+                "track": note.move_type
             }
             for move, notes in GAME_STATE["truth_moves"].items()
             for note in notes
