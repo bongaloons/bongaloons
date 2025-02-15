@@ -1,4 +1,5 @@
 import './App.css'
+import Track from './components/Track'
 
 function App() {
 
@@ -26,7 +27,7 @@ function App() {
           transformOrigin: "bottom center"
         }}
       >
-          Track 1
+          <Track position="left" text="Track 1" />
       </div>
       <div 
         className="w-40 h-[60%] bg-yellow-400 fixed bottom-[-13%] right-[40%] z-1 overflow-hidden"
@@ -35,7 +36,7 @@ function App() {
           transformOrigin: "bottom center"
         }}
       >
-          Track 2
+          <Track position="right" text="Track 2" />
       </div>
     </div>
   )
