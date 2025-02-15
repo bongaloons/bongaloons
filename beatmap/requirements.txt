@@ -2,3 +2,5 @@ pretty_midi
 setuptools
 pynput
 pygame
+fastapi==0.115.8
+uvicorn[standard]==0.34.0

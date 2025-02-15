@@ -1,0 +1,9 @@
+[project]
+name = "beatmap"
+version = "0.1.0"
+description = "Beatmap backend API"
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build" 
