@@ -123,9 +123,9 @@ def run_game(truth_moves, game_duration):
 
 def main():
     # Load truth beatmap from MIDI.
-    midi_path = "test.mid"  # Replace with your MIDI file path.
+    midi_path = "jellyfish.mid"  # Replace with your MIDI file path.
     truth_moves = parse_midi(midi_path)
-    bpm = 120.0  # default BPM (since parse_midi returns only the beatmap)
+    bpm = 125.0  # default BPM (since parse_midi returns only the beatmap)
     
     # Determine game duration: 2 seconds after the last truth note.
     max_time = 0.0

@@ -1,6 +1,7 @@
+import json
+import time
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-import time
 from midi import (
     parse_midi,
     load_truth_note,
@@ -22,20 +23,43 @@ app.add_middleware(
 
 # Game settings
 T_FALL = 2.0
+DEFAULT_BPM = 120.0  # fallback BPM
 GAME_STATE = {
     "is_running": False,
     "start_time": None,
     "game_duration": 0,
-    "bpm": 120.0
+    "bpm": DEFAULT_BPM
 }
+
+def get_bpm_from_catalog(midi_file: str) -> int:
+    """
+    Reads catalog.json (in the same directory) and returns the BPM for the given midi_file.
+    If not found, returns DEFAULT_BPM.
+    """
+    try:
+        with open("catalog.json", "r") as f:
+            catalog = json.load(f)
+        for entry in catalog:
+            # Assuming the JSON objects have a "path" key that we match against midi_file.
+            if entry.get("path") == midi_file:
+                return entry.get("bpm", DEFAULT_BPM)
+    except Exception as e:
+        print(f"Error reading catalog.json: {e}")
+    return DEFAULT_BPM
 
 @app.post("/game/start")
 async def start_game(midi_file: str = "test.mid"):
     """
     Initialize a new game session.
     Loads the truth beatmap from the MIDI file and loads each note one-by-one into the global truth map.
-    Also computes the game duration (2 seconds after the last truth note).
+    Reads the BPM from catalog.json.
+    Computes the game duration (2 seconds after the last truth note).
     """
+    # Get BPM from catalog.json instead of estimating it.
+    bpm = get_bpm_from_catalog(midi_file)
+    GAME_STATE["bpm"] = bpm
+    print(f"Using BPM from catalog: {bpm}")
+
     # Parse the entire beatmap.
     truth_moves = parse_midi(midi_file)
     
@@ -57,7 +81,7 @@ async def start_game(midi_file: str = "test.mid"):
     GAME_STATE["start_time"] = time.perf_counter()
     GAME_STATE["is_running"] = True
     
-    # Return basic game information and falling dot info.
+    # Prepare falling dot info.
     falling_dots = [
         {
             "move": move,
@@ -90,6 +114,7 @@ async def game_websocket(websocket: WebSocket):
     and the game is over.
     """
     await websocket.accept()
+    
     try:
         while True:
             data = await websocket.receive_json()
@@ -100,7 +125,6 @@ async def game_websocket(websocket: WebSocket):
             
             if data.get("key") in ["a", "l"]:
                 move = "left" if data["key"] == "a" else "right"
-                # Create a hit note.
                 hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
                 # Score the hit using score_live_note.
                 judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1)
@@ -113,9 +137,7 @@ async def game_websocket(websocket: WebSocket):
                     "totalScore": 0  # TODO: add score
                 })
             
-            # When the game time is over, process any remaining truth notes.
             if current_time >= GAME_STATE["game_duration"]:
-                # Process remaining notes (marking them as MISS if past their window)
                 for move in list(global_truth_map.keys()):
                     while global_truth_map[move]:
                         _ = score_live_note(move, current_time, None, bpm=GAME_STATE["bpm"], threshold_fraction=1/8)
@@ -136,6 +158,7 @@ async def get_game_status():
     """Get current game status."""
     if not GAME_STATE["is_running"]:
         return {"status": "not_running"}
+        
     current_time = time.perf_counter() - GAME_STATE["start_time"]
     return {
         "status": "running",
