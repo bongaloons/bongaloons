@@ -2,7 +2,6 @@ import './App.css'
 import Track from './components/Track'
 
 function App() {
-
   return (
     <div className="fixed inset-0 w-screen h-screen bg-[#E9967A] overflow-hidden">
       <div className="relative w-full h-screen bg-[#E9967A]">
@@ -14,9 +13,18 @@ function App() {
             transform: "translate(-50%, -50%) rotate(-167deg)"
           }}
         />
-        <div className="absolute top-[26.5%] left-1/2 -translate-x-1/2 w-full z-10">
-          <div className="relative">
-            <img src="/bongo_00.png" className="mx-auto max-w-[400px]" alt="Bongo cat" />
+        <div className="absolute top-[50%] left-[0%] -translate-x-[0%] -translate-y-[75%] w-full z-10">
+          <div className="relative flex justify-center">
+            {/* 
+              Using responsive width classes (e.g. 30vw) so that the cat scales with the window.
+              You can adjust this value (30vw) to achieve your desired size.
+            */}
+            <img 
+              src="/bongo_00.png" 
+              style={{ width: `1000px` }}
+              className="max-w-[400px]" 
+              alt="Bongo cat" 
+            />
           </div>
         </div>
       </div>
