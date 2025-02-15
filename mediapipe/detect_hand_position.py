@@ -140,8 +140,8 @@ def main():
     cap = cv2.VideoCapture(0)
 
     # Test hand position
-    # test_hand_position_live(cap, hands, mp_hands, mp_drawing)
-    test_check_hand_position("test.bin")
+    test_hand_position_live(cap, hands, mp_hands, mp_drawing)
+    # test_check_hand_position("test.bin")
 
     cap.release()
     cv2.destroyAllWindows()
