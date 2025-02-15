@@ -86,7 +86,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         
         try {
           console.log('Starting game...');
-          const response = await fetch('http://127.0.0.1:8000/game/start?midi_file=test.mid', {
+          const response = await fetch('http://127.0.0.1:8000/game/start?midi_file=jellyfish.mid', {
             method: 'POST',
           });
           

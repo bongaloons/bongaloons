@@ -1,0 +1,12 @@
+[
+    {
+        "name":"Jellyfish Song",
+        "path":"jellyfish.mid",
+        "bpm":125
+    },
+    {
+        "name":"Test",
+        "path":"example.mid",
+        "bpm":120
+    }
+]
