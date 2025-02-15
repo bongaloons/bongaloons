@@ -32,13 +32,27 @@ JUDGEMENT_SCORES = {
 }
 
 
-def calculate_score(judgement: str) -> int:
+def get_streak_multiplier(streak: int) -> int:
+    """
+    Get the streak multiplier based on the current streak.
+    """
+    if streak <= 1:
+        return 1
+    elif streak <= 5:
+        return 1.5
+    elif streak <= 10:
+        return 2
+    else:
+        return 2.5
+
+
+def calculate_score(judgement: str, streak: int) -> int:
     """
     Calculate the score for a given judgement.
     Returns the score value based on the JUDGEMENT_SCORES mapping.
     """
     try:
-        return JUDGEMENT_SCORES[Judgement(judgement)]
+        return JUDGEMENT_SCORES[Judgement(judgement)] * get_streak_multiplier(streak)
     except ValueError:
         return 0  # Return 0 for unknown judgement types
 

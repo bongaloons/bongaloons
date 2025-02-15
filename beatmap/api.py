@@ -7,8 +7,14 @@ from midi import (
     load_truth_note,
     score_live_note,
     Note,
-    RANKING_THRESHOLDS,
     global_truth_map
+)
+from models import (
+    GameStartInput,
+    GameStartResponse,
+    GameStatusResponse,
+    HealthCheckResponse,
+    FallingDot
 )
 from score import calculate_score
 
@@ -30,7 +36,9 @@ GAME_STATE = {
     "start_time": None,
     "game_duration": 0,
     "bpm": DEFAULT_BPM,
-    "total_score": 0
+    "total_score": 0,
+    "current_streak": 0,
+    "max_streak": 0
 }
 
 def get_bpm_from_catalog(midi_file: str) -> int:
@@ -50,25 +58,21 @@ def get_bpm_from_catalog(midi_file: str) -> int:
     return DEFAULT_BPM
 
 @app.post("/game/start")
-async def start_game(midi_file: str = "test.mid"):
+async def start_game(input: GameStartInput) -> GameStartResponse:
     """
     Initialize a new game session.
     Loads the truth beatmap from the MIDI file and loads each note one-by-one into the global truth map.
     Reads the BPM from catalog.json.
     Computes the game duration (2 seconds after the last truth note).
     """
-    # Get BPM from catalog.json instead of estimating it.
-    bpm = get_bpm_from_catalog(midi_file)
+    bpm = get_bpm_from_catalog(input.midi_file)
     GAME_STATE["bpm"] = bpm
     print(f"Using BPM from catalog: {bpm}")
 
-    # Parse the entire beatmap.
-    truth_moves = parse_midi(midi_file)
+    truth_moves = parse_midi(input.midi_file)
     
-    # Clear any previous truth notes.
     global_truth_map.clear()
     
-    # Load each truth note into the global_truth_map via load_truth_note.
     for move, notes in truth_moves.items():
         for note in notes:
             load_truth_note(move, note)
@@ -83,23 +87,24 @@ async def start_game(midi_file: str = "test.mid"):
     GAME_STATE["start_time"] = time.perf_counter()
     GAME_STATE["is_running"] = True
     GAME_STATE["total_score"] = 0
+    GAME_STATE["current_streak"] = 0
+    GAME_STATE["max_streak"] = 0
     
-    # Prepare falling dot info.
     falling_dots = [
-        {
-            "move": move,
-            "target_time": note.start * 1000,
-            "track": move
-        }
+        FallingDot(
+            move=move,
+            target_time=note.start * 1000,
+            track=move
+        )
         for move, notes in truth_moves.items()
         for note in notes
     ]
     
-    return {
-        "status": "started",
-        "duration": game_duration,
-        "falling_dots": falling_dots
-    }
+    return GameStartResponse(
+        status="started",
+        duration=game_duration,
+        falling_dots=falling_dots
+    )
 
 @app.websocket("/game/ws")
 async def game_websocket(websocket: WebSocket):
@@ -131,9 +136,14 @@ async def game_websocket(websocket: WebSocket):
                 hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
                 judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1)
                 
-                # Calculate and update score
-                score_delta = calculate_score(judgement)
+                score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
                 GAME_STATE["total_score"] += score_delta
+                
+                if judgement in ["MISS", "OOPS"]:
+                    GAME_STATE["current_streak"] = 0
+                else:
+                    GAME_STATE["current_streak"] += 1
+                    GAME_STATE["max_streak"] = max(GAME_STATE["max_streak"], GAME_STATE["current_streak"])
                 
                 await websocket.send_json({
                     "type": "hit_registered",
@@ -141,6 +151,8 @@ async def game_websocket(websocket: WebSocket):
                     "time": current_time,
                     "lastJudgement": judgement,
                     "totalScore": GAME_STATE["total_score"],
+                    "currentStreak": GAME_STATE["current_streak"],
+                    "maxStreak": GAME_STATE["max_streak"],
                     "scoreDelta": score_delta
                 })
             
@@ -149,7 +161,8 @@ async def game_websocket(websocket: WebSocket):
                     while global_truth_map[move]:
                         judgement = score_live_note(move, current_time, None, bpm=GAME_STATE["bpm"], threshold_fraction=1/8)
                         if judgement == "MISS":
-                            GAME_STATE["total_score"] += calculate_score(judgement)
+                            GAME_STATE["total_score"] += calculate_score(judgement, GAME_STATE["current_streak"])
+                            GAME_STATE["current_streak"] = 0
                 
                 await websocket.send_json({
                     "type": "game_over",
@@ -164,19 +177,19 @@ async def game_websocket(websocket: WebSocket):
         await websocket.close()
 
 @app.get("/game/status")
-async def get_game_status():
+async def get_game_status() -> GameStatusResponse:
     """Get current game status."""
     if not GAME_STATE["is_running"]:
-        return {"status": "not_running"}
+        return GameStatusResponse(status="not_running")
         
     current_time = time.perf_counter() - GAME_STATE["start_time"]
-    return {
-        "status": "running",
-        "elapsed_time": current_time,
-        "total_duration": GAME_STATE["game_duration"]
-    }
+    return GameStatusResponse(
+        status="running",
+        elapsed_time=current_time,
+        total_duration=GAME_STATE["game_duration"]
+    )
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> HealthCheckResponse:
     """Health check endpoint."""
-    return {"status": "ok"}
+    return HealthCheckResponse(status="ok")
