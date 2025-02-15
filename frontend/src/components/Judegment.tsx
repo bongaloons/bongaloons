@@ -8,7 +8,7 @@ export default function Judegment({ judgement }: { judgement: string }) {
             left: `${Math.random() * 40 + 30}%`,
           }}
         >
-          <pre className="text-2xl">
+          <pre className="text-2xl font-display">
             {judgement}
           </pre>
         </div>

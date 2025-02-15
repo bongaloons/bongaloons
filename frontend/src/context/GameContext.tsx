@@ -26,13 +26,16 @@ interface GameState {
 }
 
 interface GameContextType {
+  isStarted: boolean;
   gameState: GameState;
   ws: WebSocket | null;
   startGame: () => Promise<void>;
   updatePose: (pose: Pose) => void;
+  endGame: () => void;
 }
 
 export const GameContext = createContext<GameContextType>({
+  isStarted: false,
   gameState: {
     isRunning: false,
     currentPose: "idle",
@@ -45,11 +48,13 @@ export const GameContext = createContext<GameContextType>({
   },
   ws: null,
   startGame: async () => {},
-  updatePose: () => {}
+  updatePose: () => {},
+  endGame: () => {},
 });
 
 export const GameProvider = ({ children }: { children: ReactNode }) => {
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [isStarted, setIsStarted] = useState(false);
   const [gameState, setGameState] = useState<GameState>({
     isRunning: false,
     currentPose: "idle",
@@ -66,6 +71,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const startGame = async () => {
+    setIsStarted(true);
     try {
       // First check if backend is alive
       console.log('Checking backend health...');
@@ -114,6 +120,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           connectionStatus: 'error',
           isRunning: false
         }));
+        setIsStarted(false);
       };
 
       newWs.onclose = (event) => {
@@ -141,6 +148,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
                 totalScore: data.totalScore,
                 isRunning: false
             }));
+            setIsStarted(false);
         }
         console.log('Game state updated:', data);
       };
@@ -210,8 +218,20 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [ws]);
 
+  const endGame = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'end_game' }));
+    }
+    setGameState(prev => ({
+      ...prev,
+      isRunning: false,
+      fallingDots: [],
+    }));
+    setIsStarted(false);
+  };
+
   return (
-    <GameContext.Provider value={{ gameState, ws, startGame, updatePose }}>
+    <GameContext.Provider value={{ isStarted, gameState, ws, startGame, updatePose, endGame }}>
       {children}
     </GameContext.Provider>
   );

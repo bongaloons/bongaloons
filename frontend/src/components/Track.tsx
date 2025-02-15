@@ -13,7 +13,7 @@ const Track: FC<TrackProps> = ({ position, text }) => {
 
   return (
     <div 
-      className={`w-full h-full border-x-4 border-black relative`}
+      className={`w-full h-full border-x-4 border-black relative font-display text-xl`}
     >
       {text}
       {gameState.fallingDots.filter(dot => dot.track === position).map((dot, i) => (

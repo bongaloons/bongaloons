@@ -1,10 +1,6 @@
-import { useContext } from "react";
 import { Pose } from "../types";
-import { GameContext } from "../context/GameContext";
 
-export default function BongoCat() {
-    const { gameState } = useContext(GameContext);
-
+export default function BongoCat({pose}: {pose: Pose}) {
     function poseToImage(pose: Pose) {
         if (pose === "idle") {
             return "/bongo_11.png";
@@ -20,10 +16,9 @@ export default function BongoCat() {
         }
         return "/bongo_11.png";
     }
-
     return (
         <div>
-            <img src={poseToImage(gameState.currentPose)} className="mx-auto max-w-[400px]" alt="Bongo cat" />
+            <img src={poseToImage(pose)} alt="Bongo cat" />
         </div>
     )
 }
