@@ -32,7 +32,7 @@ def evaluate_gesture_recognizer(model, test_data):
 def main():
     dataset_path = "single_gestures"
     model_dir = "model"
-    hidden_layer_dims = [128, 64]
+    hidden_layer_dims = [128, 128, 64]
     
     train_data, validation_data, test_data = load_data(dataset_path)
     model = train_gesture_recognizer(train_data, validation_data, model_dir, hidden_layer_dims)
