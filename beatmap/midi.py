@@ -7,6 +7,7 @@ pitch_to_move = {67: "left", 72: "right"}
 
 @dataclass
 class Note:
+    move_type: str
     start: float
     duration: float
     subdivision: int  # e.g. 4 for quarter, 8 for eighth, etc.
@@ -76,7 +77,7 @@ def parse_midi(midi_path: str) -> Dict[str, List[Note]]:
             start = note.start
             duration = note.end - note.start
             subdivision = get_note_subdivision(duration, bpm)
-            note_obj = Note(start=start, duration=duration, subdivision=subdivision)
+            note_obj = Note(move_type=move, start=start, duration=duration, subdivision=subdivision)
             
             if move not in notes_by_move:
                 notes_by_move[move] = []
@@ -106,6 +107,8 @@ RANKING_THRESHOLDS = {
         "bad": 1.0,
     }
 }
+
+## REFERENCE METHOD VV ##
 
 def score_beatmaps(
     truth: Dict[str, List[Note]],
@@ -192,65 +195,190 @@ def score_beatmaps(
 
     return score_results
 
+## REFERENCE METHOD ^^ ##
+
+global_truth_map: Dict[str, List[Note]] = {}
+
+def load_truth_note(move: str, note: Note) -> None:
+    """
+    Loads a single truth note into the global_truth_map for the specified move.
+    
+    If the move does not exist in the global_truth_map, it is created.
+    The note is inserted and the list is sorted by start time.
+    
+    :param move: A string representing the move (e.g., "left" or "right").
+    :param note: The Note object to load.
+    """
+    global global_truth_map
+    if move not in global_truth_map:
+        global_truth_map[move] = []
+    global_truth_map[move].append(note)
+    # Sort the list to ensure the earliest note is first.
+    global_truth_map[move].sort(key=lambda n: n.start)
+
+
+def score_live_note(
+    move: str,
+    current_time: float,
+    hit_note: Optional[Note],
+    bpm: float,
+    threshold_fraction: float = 1/8  # used for both early and late threshold
+) -> str:
+    """
+    Scores a live note for a given move.
+    
+    It refers to the global_truth_map to get the next scheduled truth note for the move.
+    
+    - If a hit note is provided:
+      * If the hit is too early (hit time < truth_note.start - threshold), returns "OOPS".
+      * If the hit is too late (hit time > truth_note.start + threshold), returns "MISS" and removes the truth note.
+      * Otherwise, it computes the time difference and grades it (e.g. "perfect late", "good early", etc.),
+        removes the truth note, and returns the judgement.
+        
+    - If no hit note is provided:
+      * If the current_time has passed truth_note.start + threshold, the truth note is missed,
+        it is removed and "MISS" is returned.
+      * Otherwise, returns "waiting".
+    
+    Note: Once a truth note is scored (hit or miss), it is removed from global_truth_map.
+    """
+    # If no truth notes remain for the move, we can't score
+    if move not in global_truth_map or not global_truth_map[move]:
+        return "No scheduled note"
+    
+    truth_note = global_truth_map[move][0]  # Get the earliest unsolved truth note.
+    quarter_duration = 60.0 / bpm
+    threshold = threshold_fraction * quarter_duration
+    
+    if hit_note is not None:
+        diff = hit_note.start - truth_note.start
+        if diff < -threshold:
+            # Hit is too early.
+            return "OOPS"
+        if diff > threshold:
+            # Hit is too late. Remove truth note as it's missed.
+            global_truth_map[move].pop(0)
+            return "MISS"
+        
+        # Within acceptable window: compute ranking.
+        if diff == 0:
+            judgement = "perfect"
+        else:
+            hit_type = "early" if diff < 0 else "late"
+            ratio = abs(diff) / threshold
+            if ratio < RANKING_THRESHOLDS[hit_type]["perfect"]:
+                rank = "perfect"
+            elif ratio < RANKING_THRESHOLDS[hit_type]["good"]:
+                rank = "good"
+            elif ratio < RANKING_THRESHOLDS[hit_type]["meh"]:
+                rank = "meh"
+            else:
+                rank = "bad"
+            judgement = f"{rank} {hit_type}"
+        
+        # Remove the truth note since it has been scored.
+        global_truth_map[move].pop(0)
+        return judgement
+    else:
+        # No hit note provided. Check if it's already past the acceptable window.
+        if current_time > truth_note.start + threshold:
+            # Time is up for this note.
+            global_truth_map[move].pop(0)
+            return "MISS"
+        else:
+            return "waiting"
+
+# Example usage:
 if __name__ == "__main__":
-    # For testing, we create both a truth beatmap and a user beatmap manually.
-    # We'll assume a sample BPM.
-    sample_bpm = 120.0  # 120 BPM => quarter note = 0.5 sec; with threshold_fraction=1/8, threshold = 0.0625 sec
+    bpm = 120.0
+    threshold_fraction = 1/4
+
+    # Load truth notes one at a time using load_truth_note.
+    load_truth_note("left", Note(start=1.00, duration=0.5, subdivision=8))
+    load_truth_note("left", Note(start=2.00, duration=0.5, subdivision=8))
+    load_truth_note("left", Note(start=3.00, duration=0.5, subdivision=8))
+    load_truth_note("right", Note(start=1.50, duration=0.5, subdivision=8))
+    load_truth_note("right", Note(start=2.50, duration=0.5, subdivision=8))
+
+    # Case 1: A left hit at 1.02 sec.
+    hit_left = Note(start=1.02, duration=0.5, subdivision=8)
+    status = score_live_note("left", current_time=1.02, hit_note=hit_left, bpm=bpm, threshold_fraction=threshold_fraction)
+    print("Left hit at 1.02 sec:", status)
     
-    # Create a truth beatmap manually.
-    # For "left", truth notes at 1.00 sec, 2.00 sec, and 3.00 sec.
-    truth_moves: Dict[str, List[Note]] = {
-        "left": [
-            Note(start=1.00, duration=0.5, subdivision=8),
-            Note(start=2.00, duration=0.5, subdivision=8),
-            Note(start=3.00, duration=0.5, subdivision=8),
-        ],
-        "right": [
-            Note(start=1.50, duration=0.5, subdivision=8),
-            Note(start=2.50, duration=0.5, subdivision=8),
-        ]
-    }
+    # Case 2: No hit, current time 2.08 sec for left.
+    status = score_live_note("left", current_time=2.08, hit_note=None, bpm=bpm, threshold_fraction=threshold_fraction)
+    print("Left, no hit at 2.08 sec:", status)
     
-    # Create a user hit beatmap manually to test various edge cases.
-    user_moves: Dict[str, List[Note]] = {
-        "left": [
-            # Good hit for the first truth note (diff = +0.02 sec)
-            Note(start=1.02, duration=0.5, subdivision=8),
-            # A hit that is too early for the second truth note:
-            # (Truth at 2.00 sec; hit at 1.93 sec is too early)
-            Note(start=1.93, duration=0.5, subdivision=8),
-            # A valid hit for the second truth note (diff = +0.04 sec)
-            Note(start=2.04, duration=0.5, subdivision=8),
-            # A hit that is too late for the third truth note:
-            # (Truth at 3.00 sec; hit at 3.10 sec is beyond 3.0625, so it's a MISS)
-            Note(start=3.10, duration=0.5, subdivision=8),
-            # Extra hit that should be marked as OOPS because there's no corresponding truth note.
-            Note(start=3.15, duration=0.5, subdivision=8),
-        ],
-        "right": [
-            # Good hit for the first truth note (exactly on time)
-            Note(start=1.00, duration=0.5, subdivision=8),
-            # A hit that's too early for the second truth note:
-            # (Truth at 2.50 sec; hit at 2.40 sec is too early)
-            Note(start=2.40, duration=0.5, subdivision=8),
-            # Extra hits beyond the truth notes (should be OOPS)
-            Note(start=2.40, duration=0.5, subdivision=8),
-            Note(start=2.40, duration=0.5, subdivision=8)
-        ]
-    }
+    # Case 3: A right hit at 1.40 sec (too early) for right.
+    hit_right = Note(start=1.40, duration=0.5, subdivision=8)
+    status = score_live_note("right", current_time=1.40, hit_note=hit_right, bpm=bpm, threshold_fraction=threshold_fraction)
+    print("Right hit at 1.40 sec:", status)
     
-    # Score the beatmaps.
-    # (Using threshold_fraction=1/8 so threshold = 0.0625 sec at 120 BPM)
-    scores = score_beatmaps(truth_moves, user_moves, bpm=sample_bpm, threshold_fraction=1)
+    # Case 4: A right hit at 1.52 sec (good) for right.
+    hit_right_good = Note(start=1.52, duration=0.5, subdivision=8)
+    status = score_live_note("right", current_time=1.52, hit_note=hit_right_good, bpm=bpm, threshold_fraction=threshold_fraction)
+    print("Right hit at 1.52 sec:", status)
+
+
+# if __name__ == "__main__":
+#     # For testing, we create both a truth beatmap and a user beatmap manually.
+#     # We'll assume a sample BPM.
+#     sample_bpm = 120.0  # 120 BPM => quarter note = 0.5 sec; with threshold_fraction=1/8, threshold = 0.0625 sec
     
-    print("\nScoring Results:")
-    for move, results in scores.items():
-        print(f"\nMove '{move}':")
-        for truth_note, user_note, diff, judgement in results:
-            if truth_note is not None and user_note is not None:
-                print(f"  Truth note at {truth_note.start:.2f} sec matched with hit at {user_note.start:.2f} sec "
-                      f"(diff: {diff:+.2f} sec) -> {judgement}")
-            elif truth_note is not None:
-                print(f"  Truth note at {truth_note.start:.2f} sec -> {judgement}")
-            elif user_note is not None:
-                print(f"  Extra hit at {user_note.start:.2f} sec -> {judgement}")
+#     # Create a truth beatmap manually.
+#     # For "left", truth notes at 1.00 sec, 2.00 sec, and 3.00 sec.
+#     truth_moves: Dict[str, List[Note]] = {
+#         "left": [
+#             Note(start=1.00, duration=0.5, subdivision=8),
+#             Note(start=2.00, duration=0.5, subdivision=8),
+#             Note(start=3.00, duration=0.5, subdivision=8),
+#         ],
+#         "right": [
+#             Note(start=1.50, duration=0.5, subdivision=8),
+#             Note(start=2.50, duration=0.5, subdivision=8),
+#         ]
+#     }
+    
+#     # Create a user hit beatmap manually to test various edge cases.
+#     user_moves: Dict[str, List[Note]] = {
+#         "left": [
+#             # Good hit for the first truth note (diff = +0.02 sec)
+#             Note(start=1.02, duration=0.5, subdivision=8),
+#             # A hit that is too early for the second truth note:
+#             # (Truth at 2.00 sec; hit at 1.93 sec is too early)
+#             Note(start=1.93, duration=0.5, subdivision=8),
+#             # A valid hit for the second truth note (diff = +0.04 sec)
+#             Note(start=2.04, duration=0.5, subdivision=8),
+#             # A hit that is too late for the third truth note:
+#             # (Truth at 3.00 sec; hit at 3.10 sec is beyond 3.0625, so it's a MISS)
+#             Note(start=3.10, duration=0.5, subdivision=8),
+#             # Extra hit that should be marked as OOPS because there's no corresponding truth note.
+#             Note(start=3.15, duration=0.5, subdivision=8),
+#         ],
+#         "right": [
+#             # Good hit for the first truth note (exactly on time)
+#             Note(start=1.00, duration=0.5, subdivision=8),
+#             # A hit that's too early for the second truth note:
+#             # (Truth at 2.50 sec; hit at 2.40 sec is too early)
+#             Note(start=2.40, duration=0.5, subdivision=8),
+#             # Extra hits beyond the truth notes (should be OOPS)
+#             Note(start=2.40, duration=0.5, subdivision=8),
+#             Note(start=2.40, duration=0.5, subdivision=8)
+#         ]
+#     }
+    
+#     # Score the beatmaps.
+#     # (Using threshold_fraction=1/8 so threshold = 0.0625 sec at 120 BPM)
+#     scores = score_beatmaps(truth_moves, user_moves, bpm=sample_bpm, threshold_fraction=1)
+    
+#     print("\nScoring Results:")
+#     for move, results in scores.items():
+#         print(f"\nMove '{move}':")
+#         for truth_note, user_note, diff, judgement in results:
+#             if truth_note is not None and user_note is not None:
+#                 print(f"  Truth note at {truth_note.start:.2f} sec matched with hit at {user_note.start:.2f} sec "
+#                       f"(diff: {diff:+.2f} sec) -> {judgement}")
+#             elif truth_note is not None:
+#                 print(f"  Truth note at {truth_note.start:.2f} sec -> {judgement}")
+#             elif user_note is not None:
+#                 print(f"  Extra hit at {user_note.start:.2f} sec -> {judgement}")

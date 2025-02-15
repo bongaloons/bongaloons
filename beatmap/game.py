@@ -110,7 +110,7 @@ def run_game(truth_moves, game_duration):
                 if event.key in KEY_TO_MOVE:
                     move = KEY_TO_MOVE[event.key]
                     hit_time = current_time
-                    hit = Note(start=hit_time, duration=0.0, subdivision=0)
+                    hit = Note(start=hit_time, duration=0.0, subdivision=0, move_type=move)
                     user_moves.setdefault(move, []).append(hit)
                     print(f"[HIT] {move.upper()} at {hit_time:.2f} sec")
         

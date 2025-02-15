@@ -65,7 +65,7 @@ async def game_websocket(websocket: WebSocket):
             
             if data["key"] in ["a", "l"]:
                 move = "left" if data["key"] == "a" else "right"
-                hit = Note(start=current_time, duration=0.0, subdivision=0)
+                hit = Note(start=current_time, duration=0.0, subdivision=0, move_type=move)
                 GAME_STATE["user_moves"][move].append(hit)
                 
                 current_scores = score_beatmaps(
