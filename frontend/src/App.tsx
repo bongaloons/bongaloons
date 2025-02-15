@@ -18,14 +18,14 @@ function App() {
       </div>
 
 
-      <div className="absolute flex flex-col gap-2 top-4 left-4 px-4 py-2 bg-white rounded-lg shadow-lg z-20">
-        <button
-          onClick={startGame}
-          className="py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 z-20"
+    <div className="absolute flex flex-col gap-2 top-4 left-4 px-4 py-2 bg-white rounded-lg shadow-lg z-20">
+      <button
+        onClick={startGame}
+        className="py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 z-20"
         >
-          Start Game
-        </button>
-        <div className="font-bold text-lg">Total Score: {gameState.totalScore}</div>
+        Start Game
+      </button>
+      <div className="font-bold text-lg">Total Score: {gameState.totalScore}</div>
       </div>
 
       {gameState.lastJudgement && (
@@ -63,6 +63,14 @@ function App() {
         </div>
       </div>
       <div 
+        className="w-[150vw] h-[80vh] bg-orange-100 fixed bottom-[-32vh] -right-[25vw] z-1 overflow-hidden"
+        style={{
+          transform: "rotate(13deg)",
+          transformOrigin: "bottom center"
+        }}
+      >
+      </div>
+      <div 
         className="w-40 h-[64%] bg-blue-200 fixed bottom-[-9%] right-[60%] z-1 overflow-hidden"
         style={{
           transform: "rotate(13deg)",
@@ -72,7 +80,7 @@ function App() {
           <Track position="left" text="Track 1" />
       </div>
       <div 
-        className="w-40 h-[60%] bg-yellow-400 fixed bottom-[-13%] right-[40%] z-1 overflow-hidden"
+        className="w-40 h-[60%] bg-yellow-200 fixed bottom-[-13%] right-[40%] z-1 overflow-hidden"
         style={{
           transform: "rotate(13deg)",
           transformOrigin: "bottom center"
