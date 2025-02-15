@@ -10,6 +10,7 @@ from midi import (
     RANKING_THRESHOLDS,
     global_truth_map
 )
+from score import calculate_score
 
 app = FastAPI()
 
@@ -28,7 +29,8 @@ GAME_STATE = {
     "is_running": False,
     "start_time": None,
     "game_duration": 0,
-    "bpm": DEFAULT_BPM
+    "bpm": DEFAULT_BPM,
+    "total_score": 0
 }
 
 def get_bpm_from_catalog(midi_file: str) -> int:
@@ -80,6 +82,7 @@ async def start_game(midi_file: str = "test.mid"):
     GAME_STATE["game_duration"] = game_duration
     GAME_STATE["start_time"] = time.perf_counter()
     GAME_STATE["is_running"] = True
+    GAME_STATE["total_score"] = 0
     
     # Prepare falling dot info.
     falling_dots = [
@@ -126,25 +129,32 @@ async def game_websocket(websocket: WebSocket):
             if data.get("key") in ["a", "l"]:
                 move = "left" if data["key"] == "a" else "right"
                 hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
-                # Score the hit using score_live_note.
                 judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1)
+                
+                # Calculate and update score
+                score_delta = calculate_score(judgement)
+                GAME_STATE["total_score"] += score_delta
                 
                 await websocket.send_json({
                     "type": "hit_registered",
                     "move": move,
                     "time": current_time,
                     "lastJudgement": judgement,
-                    "totalScore": 0  # TODO: add score
+                    "totalScore": GAME_STATE["total_score"],
+                    "scoreDelta": score_delta
                 })
             
             if current_time >= GAME_STATE["game_duration"]:
                 for move in list(global_truth_map.keys()):
                     while global_truth_map[move]:
-                        _ = score_live_note(move, current_time, None, bpm=GAME_STATE["bpm"], threshold_fraction=1/8)
+                        judgement = score_live_note(move, current_time, None, bpm=GAME_STATE["bpm"], threshold_fraction=1/8)
+                        if judgement == "MISS":
+                            GAME_STATE["total_score"] += calculate_score(judgement)
                 
                 await websocket.send_json({
                     "type": "game_over",
-                    "message": "Game over!"
+                    "message": "Game over!",
+                    "totalScore": GAME_STATE["total_score"]
                 })
                 GAME_STATE["is_running"] = False
                 break

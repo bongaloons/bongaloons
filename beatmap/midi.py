@@ -1,6 +1,7 @@
 import pretty_midi
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
+from score import Judgement
 
 # Mapping from MIDI pitch to move name.
 pitch_to_move = {67: "left", 72: "right"}
@@ -11,6 +12,7 @@ class Note:
     start: float
     duration: float
     subdivision: int  # e.g. 4 for quarter, 8 for eighth, etc.
+
 
 def get_note_subdivision(duration: float, bpm: float) -> int:
     """
@@ -151,20 +153,20 @@ def score_beatmaps(
             
             # If the user hit is too early for the current truth note, record it as OOPS.
             if u_note.start < t_note.start - threshold:
-                results.append((None, u_note, None, "OOPS"))
+                results.append((None, u_note, None, Judgement.OOPS))
                 u_idx += 1
                 continue
             
             # If the user hit is too late for the current truth note, mark the truth note as MISS.
             if u_note.start > t_note.start + threshold:
-                results.append((t_note, None, None, "MISS"))
+                results.append((t_note, None, None, Judgement.MISS))
                 t_idx += 1
                 continue
             
             # Now the user note is within the acceptable window.
             diff = u_note.start - t_note.start
             if diff == 0:
-                judgement = "perfect"
+                judgement = Judgement.PERFECT
             else:
                 hit_type = "early" if diff < 0 else "late"
                 ratio = abs(diff) / threshold
@@ -176,7 +178,25 @@ def score_beatmaps(
                     rank = "meh"
                 else:
                     rank = "bad"
-                judgement = f"{rank} {hit_type}"
+                
+                if hit_type == "early":
+                    if rank == "perfect":
+                        judgement = Judgement.PERFECT_EARLY
+                    elif rank == "good":
+                        judgement = Judgement.GOOD_EARLY
+                    elif rank == "meh":
+                        judgement = Judgement.MEH_EARLY
+                    else:
+                        judgement = Judgement.BAD_EARLY
+                else:
+                    if rank == "perfect":
+                        judgement = Judgement.PERFECT_LATE
+                    elif rank == "good":
+                        judgement = Judgement.GOOD_LATE
+                    elif rank == "meh":
+                        judgement = Judgement.MEH_LATE
+                    else:
+                        judgement = Judgement.BAD_LATE
             
             results.append((t_note, u_note, diff, judgement))
             t_idx += 1
@@ -184,12 +204,12 @@ def score_beatmaps(
         
         # Any remaining truth notes are marked as MISS.
         while t_idx < len(truth_notes):
-            results.append((truth_notes[t_idx], None, None, "MISS"))
+            results.append((truth_notes[t_idx], None, None, Judgement.MISS))
             t_idx += 1
         
         # Any remaining user notes are extra hits: mark them as OOPS.
         while u_idx < len(user_notes):
-            results.append((None, user_notes[u_idx], None, "OOPS"))
+            results.append((None, user_notes[u_idx], None, Judgement.OOPS))
             u_idx += 1
 
         score_results[move] = results
@@ -257,15 +277,15 @@ def score_live_note(
         diff = hit_note.start - (truth_note.start + DELAY_OFFSET)
         if diff < -threshold:
             # Hit is too early.
-            return "OOPS"
+            return Judgement.OOPS
         if diff > threshold:
             # Hit is too late. Remove truth note as it's missed.
             global_truth_map[move].pop(0)
-            return "MISS"
+            return Judgement.MISS
         
         # Within acceptable window: compute ranking.
         if diff == 0:
-            judgement = "perfect"
+            judgement = Judgement.PERFECT
         else:
             hit_type = "early" if diff < 0 else "late"
             ratio = abs(diff) / threshold
@@ -277,7 +297,25 @@ def score_live_note(
                 rank = "meh"
             else:
                 rank = "bad"
-            judgement = f"{rank} {hit_type}"
+            
+            if hit_type == "early":
+                if rank == "perfect":
+                    judgement = Judgement.PERFECT_EARLY
+                elif rank == "good":
+                    judgement = Judgement.GOOD_EARLY
+                elif rank == "meh":
+                    judgement = Judgement.MEH_EARLY
+                else:
+                    judgement = Judgement.BAD_EARLY
+            else:
+                if rank == "perfect":
+                    judgement = Judgement.PERFECT_LATE
+                elif rank == "good":
+                    judgement = Judgement.GOOD_LATE
+                elif rank == "meh":
+                    judgement = Judgement.MEH_LATE
+                else:
+                    judgement = Judgement.BAD_LATE
         
         # Remove the truth note since it has been scored.
         global_truth_map[move].pop(0)
@@ -287,7 +325,7 @@ def score_live_note(
         if current_time > truth_note.start + threshold:
             # Time is up for this note.
             global_truth_map[move].pop(0)
-            return "MISS"
+            return Judgement.MISS
         else:
             return "waiting"
 
