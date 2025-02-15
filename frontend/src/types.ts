@@ -1,0 +1,1 @@
+export type Pose = "left" | "right" | "idle" | "both";

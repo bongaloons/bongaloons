@@ -2,6 +2,8 @@ import { FC, useEffect, useState } from 'react';
 
 interface DotProps {
   delay: number;
+  targetTime: number;
+  fallDuration: number;
 }
 
 const Dot: FC<DotProps> = ({ delay }) => {
