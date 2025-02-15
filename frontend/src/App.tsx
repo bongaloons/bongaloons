@@ -17,12 +17,31 @@ function App() {
         WS: {gameState.connectionStatus}
       </div>
 
-      <button
-        onClick={startGame}
-        className="absolute top-4 left-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 z-20"
-      >
-        Start Game
-      </button>
+
+      <div className="absolute flex flex-col gap-2 top-4 left-4 px-4 py-2 bg-white rounded-lg shadow-lg z-20">
+        <button
+          onClick={startGame}
+          className="py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 z-20"
+        >
+          Start Game
+        </button>
+        <div className="font-bold text-lg">Total Score: {gameState.totalScore}</div>
+      </div>
+
+      {gameState.lastJudgement && (
+        <div 
+          key={gameState.lastJudgement}
+          className="absolute p-4 bg-white rounded-lg shadow-lg z-20 animate-fade-in-out"
+          style={{
+            top: `${Math.random() * 30 + 35}%`,
+            left: `${Math.random() * 40 + 30}%`,
+          }}
+        >
+          <pre className="text-2xl">
+            {gameState.lastJudgement}
+          </pre>
+        </div>
+      )}
 
       <div className="relative w-full h-screen bg-[#E9967A]">
         <div

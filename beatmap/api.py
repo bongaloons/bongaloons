@@ -68,10 +68,27 @@ async def game_websocket(websocket: WebSocket):
                 hit = Note(start=current_time, duration=0.0, subdivision=0)
                 GAME_STATE["user_moves"][move].append(hit)
                 
+                current_scores = score_beatmaps(
+                    GAME_STATE["truth_moves"],
+                    GAME_STATE["user_moves"],
+                    bpm=120.0,
+                    threshold_fraction=1/8
+                )
+                
+                total_score = 0
+                last_judgement = None
+                for _, results in current_scores.items():
+                    for res in results:
+                        if res[3]:
+                            total_score += 1 if res[3] == "Perfect" else 0.5 if res[3] == "Good" else 0
+                            last_judgement = res[3]
+                
                 await websocket.send_json({
                     "type": "hit_registered",
                     "move": move,
-                    "time": current_time
+                    "time": current_time,
+                    "lastJudgement": last_judgement,
+                    "totalScore": total_score
                 })
                 
             if current_time >= GAME_STATE["game_duration"]:
@@ -81,6 +98,14 @@ async def game_websocket(websocket: WebSocket):
                     bpm=120.0,
                     threshold_fraction=1/8
                 )
+                
+                total_score = 0
+                last_judgement = None
+                for move, results in scores.items():
+                    for res in results:
+                        if res[3]:
+                            total_score += 1 if res[3] == "Perfect" else 0.5 if res[3] == "Good" else 0
+                            last_judgement = res[3]
                 
                 await websocket.send_json({
                     "type": "game_over",
@@ -95,7 +120,9 @@ async def game_websocket(websocket: WebSocket):
                             for res in results
                         ]
                         for move, results in scores.items()
-                    }
+                    },
+                    "total_score": total_score,
+                    "last_judgement": last_judgement
                 })
                 GAME_STATE["is_running"] = False
                 break

@@ -12,6 +12,16 @@ interface GameState {
     track: string;
   }>;
   connectionStatus: ConnectionStatus;
+  lastJudgement: string | null;
+  totalScore: number | null;
+  scores: {
+    [key: string]: Array<{
+      truth_time: number | null;
+      hit_time: number | null;
+      difference: number | null;
+      judgement: string;
+    }>;
+  } | null;
 }
 
 interface GameContextType {
@@ -26,7 +36,10 @@ export const GameContext = createContext<GameContextType>({
     isRunning: false,
     currentPose: "idle",
     fallingDots: [],
-    connectionStatus: 'disconnected'
+    connectionStatus: 'disconnected',
+    scores: null,
+    lastJudgement: null,
+    totalScore: null
   },
   ws: null,
   startGame: async () => {},
@@ -39,7 +52,10 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     isRunning: false,
     currentPose: "idle",
     fallingDots: [],
-    connectionStatus: 'disconnected'
+    connectionStatus: 'disconnected',
+    scores: null,
+    lastJudgement: null,
+    totalScore: null
   });
 
   const updatePose = (pose: Pose) => {
@@ -104,6 +120,26 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           connectionStatus: 'disconnected',
           isRunning: false
         }));
+      };
+
+      newWs.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "hit_registered") {
+            setGameState(prev => ({
+                ...prev,
+                lastJudgement: data.lastJudgement,
+                totalScore: data.totalScore,
+            }));
+        } else if (data.type === "game_over") {
+            setGameState(prev => ({
+                ...prev,
+                scores: data.scores,
+                lastJudgement: data.lastJudgement,
+                totalScore: data.totalScore,
+                isRunning: false
+            }));
+        }
+        console.log('Game state updated:', data);
       };
       
       setWs(newWs);
