@@ -22,6 +22,7 @@ interface GameState {
       judgement: string;
     }>;
   } | null;
+  pressedKeys: Set<string>;
 }
 
 interface GameContextType {
@@ -39,7 +40,8 @@ export const GameContext = createContext<GameContextType>({
     connectionStatus: 'disconnected',
     scores: null,
     lastJudgement: null,
-    totalScore: null
+    totalScore: null,
+    pressedKeys: new Set<string>(),
   },
   ws: null,
   startGame: async () => {},
@@ -55,7 +57,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     connectionStatus: 'disconnected',
     scores: null,
     lastJudgement: null,
-    totalScore: null
+    totalScore: null,
+    pressedKeys: new Set<string>(),
   });
 
   const updatePose = (pose: Pose) => {
@@ -156,6 +159,46 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   };
+
+  const updatePoseBasedOnKeys = (pressedKeys: Set<string>) => {
+    if (pressedKeys.has('a') && pressedKeys.has('l')) {
+      updatePose('both');
+    } else if (pressedKeys.has('a')) {
+      updatePose('left');
+    } else if (pressedKeys.has('l')) {
+      updatePose('right');
+    } else {
+      updatePose('idle');
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!ws || !['a', 'l'].includes(e.key) || gameState.pressedKeys.has(e.key)) return;
+      
+      const newPressedKeys = new Set(gameState.pressedKeys).add(e.key);
+      setGameState(prev => ({ ...prev, pressedKeys: newPressedKeys }));
+      ws.send(JSON.stringify({ key: e.key }));
+      updatePoseBasedOnKeys(newPressedKeys);
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!['a', 'l'].includes(e.key)) return;
+      
+      const newPressedKeys = new Set(gameState.pressedKeys);
+      newPressedKeys.delete(e.key);
+      setGameState(prev => ({ ...prev, pressedKeys: newPressedKeys }));
+      updatePoseBasedOnKeys(newPressedKeys);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [ws, gameState.pressedKeys, updatePose]);
 
   // Cleanup WebSocket on unmount
   useEffect(() => {

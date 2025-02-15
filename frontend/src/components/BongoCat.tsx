@@ -15,7 +15,10 @@ export default function BongoCat() {
         if (pose === "right") {
             return "/bongo_10.png";
         }
-        return "/bongo_00.png";
+        if (pose === "both") {
+            return "/bongo_00.png";
+        }
+        return "/bongo_11.png";
     }
 
     return (

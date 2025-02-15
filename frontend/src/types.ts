@@ -1,1 +1,1 @@
-export type Pose = "left" | "right" | "idle";
+export type Pose = "left" | "right" | "idle" | "both";
