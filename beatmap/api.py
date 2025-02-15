@@ -61,7 +61,7 @@ async def start_game(midi_file: str = "test.mid"):
     falling_dots = [
         {
             "move": move,
-            "target_time": note.start,
+            "target_time": note.start * 1000,
             "track": move
         }
         for move, notes in truth_moves.items()
@@ -103,13 +103,14 @@ async def game_websocket(websocket: WebSocket):
                 # Create a hit note.
                 hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
                 # Score the hit using score_live_note.
-                judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1/2)
+                judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1)
                 
                 await websocket.send_json({
                     "type": "hit_registered",
                     "move": move,
                     "time": current_time,
-                    "judgement": judgement
+                    "lastJudgement": judgement,
+                    "totalScore": 0  # TODO: add score
                 })
             
             # When the game time is over, process any remaining truth notes.

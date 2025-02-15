@@ -56,6 +56,7 @@ def get_note_subdivision(duration: float, bpm: float) -> int:
 
     return note_subdivisions.get(best_match, -1)
 
+
 def parse_midi(midi_path: str) -> Dict[str, List[Note]]:
     """
     Parses the MIDI file and returns a dictionary where the key is the move name (derived from the MIDI note pitch)
@@ -216,6 +217,7 @@ def load_truth_note(move: str, note: Note) -> None:
     # Sort the list to ensure the earliest note is first.
     global_truth_map[move].sort(key=lambda n: n.start)
 
+DELAY_OFFSET = 2
 
 def score_live_note(
     move: str,
@@ -251,7 +253,8 @@ def score_live_note(
     threshold = threshold_fraction * quarter_duration
     
     if hit_note is not None:
-        diff = hit_note.start - truth_note.start
+        print(f"hit_note.start: {hit_note.start}, truth_note.start: {truth_note.start}, DELAY_OFFSET: {DELAY_OFFSET}")
+        diff = hit_note.start - (truth_note.start + DELAY_OFFSET)
         if diff < -threshold:
             # Hit is too early.
             return "OOPS"
