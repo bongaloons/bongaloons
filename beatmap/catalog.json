@@ -1,0 +1,16 @@
+[
+    {
+        "id": 0,
+        "name":"Jellyfish Jam",
+        "path":"/songmaps/jellyfish.mid",
+        "song":"/songs/jellyfishjam.mp3",
+        "bpm":125
+    },
+    {
+        "id": 1,
+        "name":"Goofy Silly Test Song",
+        "path":"/songmaps/test.mid",
+        "song":"/songs/test.mp3",
+        "bpm":120
+    }
+]

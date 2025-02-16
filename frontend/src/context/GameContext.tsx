@@ -5,6 +5,9 @@ type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 interface GameState {
   isRunning: boolean;
+  songPath: string;
+  mapPath: string;      // New: Path of the MIDI file
+  songName: string;     // New: Name of the song
   currentPose: Pose;
   fallingDots: Array<{
     move: string;
@@ -14,6 +17,8 @@ interface GameState {
   connectionStatus: ConnectionStatus;
   lastJudgement: string | null;
   totalScore: number | null;
+  currentStreak: number | null;
+  maxStreak: number | null;
   scores: {
     [key: string]: Array<{
       truth_time: number | null;
@@ -26,46 +31,69 @@ interface GameState {
 }
 
 interface GameContextType {
+  isStarted: boolean;
   gameState: GameState;
   ws: WebSocket | null;
-  startGame: () => Promise<void>;
+  startGame: (songId?: number) => Promise<void>;
   updatePose: (pose: Pose) => void;
+  endGame: () => void;
+  showSongSelect: boolean;
+  setShowSongSelect: (show: boolean) => void;
+  playAgain: () => void;
 }
 
 export const GameContext = createContext<GameContextType>({
+  isStarted: false,
   gameState: {
     isRunning: false,
+    songPath: "",
+    mapPath: "",
+    songName: "",
     currentPose: "idle",
     fallingDots: [],
     connectionStatus: 'disconnected',
     scores: null,
     lastJudgement: null,
     totalScore: null,
+    currentStreak: null,
+    maxStreak: null,
     pressedKeys: new Set<string>(),
   },
   ws: null,
   startGame: async () => {},
-  updatePose: () => {}
+  updatePose: () => {},
+  endGame: () => {},
+  showSongSelect: false,
+  setShowSongSelect: () => {},
+  playAgain: () => {},
 });
 
 export const GameProvider = ({ children }: { children: ReactNode }) => {
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [isStarted, setIsStarted] = useState(false);
+  const [showSongSelect, setShowSongSelect] = useState(false);
   const [gameState, setGameState] = useState<GameState>({
     isRunning: false,
+    songPath: "",
+    mapPath: "",
+    songName: "",
     currentPose: "idle",
     fallingDots: [],
     connectionStatus: 'disconnected',
     scores: null,
     lastJudgement: null,
     totalScore: null,
+    currentStreak: null,
+    maxStreak: null,
     pressedKeys: new Set<string>(),
   });
 
   const updatePose = (pose: Pose) => {
     setGameState(prev => ({ ...prev, currentPose: pose }));
-  }
+  };
 
-  const startGame = async () => {
+  const startGame = async (songId: number = 0) => {
+    setIsStarted(true);
     try {
       // First check if backend is alive
       console.log('Checking backend health...');
@@ -86,8 +114,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         
         try {
           console.log('Starting game...');
-          const response = await fetch('http://127.0.0.1:8000/game/start?midi_file=test.mid', {
-            method: 'POST',
+          const response = await fetch(`http://127.0.0.1:8000/game/start?id=${songId}`, {
+            method: 'POST'
           });
           
           if (!response.ok) {
@@ -99,6 +127,9 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           setGameState(prev => ({
             ...prev,
             isRunning: true,
+            songPath: data.songPath,     // Updated field from API
+            mapPath: data.midiPath,      // New field from API
+            songName: data.songName,     // New field from API (if provided)
             fallingDots: data.falling_dots
           }));
         } catch (error) {
@@ -114,6 +145,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           connectionStatus: 'error',
           isRunning: false
         }));
+        setIsStarted(false);
       };
 
       newWs.onclose = (event) => {
@@ -132,6 +164,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
                 ...prev,
                 lastJudgement: data.lastJudgement,
                 totalScore: data.totalScore,
+                currentStreak: data.currentStreak,
+                maxStreak: data.maxStreak,
             }));
         } else if (data.type === "game_over") {
             setGameState(prev => ({
@@ -139,8 +173,11 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
                 scores: data.scores,
                 lastJudgement: data.lastJudgement,
                 totalScore: data.totalScore,
+                currentStreak: 0,
+                maxStreak: data.maxStreak,
                 isRunning: false
             }));
+            setIsStarted(false);
         }
         console.log('Game state updated:', data);
       };
@@ -210,9 +247,44 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [ws]);
 
+  const endGame = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'end_game' }));
+    }
+    setGameState(prev => ({
+      ...prev,
+      isRunning: false,
+      fallingDots: [],
+    }));
+    setIsStarted(false);
+  };
+
+  const playAgain = () => {
+    setGameState(prev => ({
+      ...prev,
+      totalScore: null,
+      currentStreak: null,
+      maxStreak: null,
+      scores: null,
+      isRunning: false,
+      fallingDots: [],
+    }));
+    setShowSongSelect(true);
+  };
+
   return (
-    <GameContext.Provider value={{ gameState, ws, startGame, updatePose }}>
+    <GameContext.Provider value={{ 
+      isStarted, 
+      gameState, 
+      ws, 
+      startGame, 
+      updatePose, 
+      endGame,
+      showSongSelect,
+      setShowSongSelect,
+      playAgain
+    }}>
       {children}
     </GameContext.Provider>
   );
-}; 
+};

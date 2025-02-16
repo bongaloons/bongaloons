@@ -1,6 +1,18 @@
 @import "tailwindcss";
 
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+@layer base {
+  html {
+    font-family: 'Barriecito', cursive;
+  }
+}
+
+@layer components {
+  .font-broken {
+    font-family: 'Rubik Broken Fax', system-ui, sans-serif;
+  }
+}
