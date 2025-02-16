@@ -1,12 +1,14 @@
-import { FC, useEffect, useState } from 'react';
+import { FC, useEffect, useState, useContext, useRef } from 'react';
+import { GameContext } from '../context/GameContext';
 
 interface DotProps {
-  delay: number;
-  targetTime: number;
-  fallDuration: number;
+  delay: number;       // Initial delay (ms) before the dot should appear (relative to game timeline)
+  targetTime: number;  // Time (ms) when the dot is meant to be hit
+  fallDuration: number; // Duration (ms) for the dot to fall from its spawn position to the target
 }
 
 const Dot: FC<DotProps> = ({ delay, targetTime, fallDuration }) => {
+  const { gameState } = useContext(GameContext);
   const [position, setPosition] = useState(-100);
   const [isSprite] = useState(() => Math.random() < 0.4);
   const [visual] = useState(() => {
@@ -28,31 +30,57 @@ const Dot: FC<DotProps> = ({ delay, targetTime, fallDuration }) => {
     }
   });
 
+  // Always get the latest gameState via a ref.
+  const gameStateRef = useRef(gameState);
   useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
+  // Ref to hold the effective game time (time elapsed that doesn't advance when paused)
+  const effectiveTimeRef = useRef(0);
+
+  // Local state to determine when to spawn (i.e. start animation)
+  const [spawned, setSpawned] = useState(false);
+
+  // Effect to update effective time and check for spawn.
+  useEffect(() => {
+    // Calculate the intended spawn time (ms)
+    const spawnTime = targetTime - fallDuration + delay;
+    const checkSpawn = () => {
+      // Compute effective time: subtract totalPausedTime from elapsed time.
+      const effectiveTime = gameState.startTime 
+        ? performance.now() - gameState.startTime - gameState.totalPausedTime 
+        : 0;
+        // console.log("Paused time:", gameState.totalPausedTime );
+        // console.log("Effective time:", effectiveTime );
+        if (effectiveTime >= spawnTime) {
+        setSpawned(true);
+      }
+    };
+    const intervalId = setInterval(checkSpawn, 50);
+    return () => clearInterval(intervalId);
+  }, [delay, targetTime, fallDuration, gameState.startTime, gameState.totalPausedTime]);
+  
+
+  // Effect to animate the dot once it has spawned.
+  useEffect(() => {
+    if (!spawned) return;
     const animate = () => {
-      setPosition((prev) => {
+      setPosition(prev => {
         if (prev >= 100) return 100;
-        
         const totalDistance = 200;
-        const speedPer50ms = (totalDistance / fallDuration) * 50;
-        
+        // Use the latest pause status from our ref.
+        const isPaused = gameStateRef.current.isPaused;
+        const speedPer50ms = isPaused ? 0 : (totalDistance / fallDuration) * 50;
         return prev + speedPer50ms;
       });
     };
+    const interval = setInterval(animate, 50);
+    return () => clearInterval(interval);
+  }, [spawned, fallDuration]);
 
-    const timeout = setTimeout(() => {
-      const interval = setInterval(animate, 50);
-
-      return () => clearInterval(interval);
-    }, targetTime - fallDuration + delay);
-
-    return () => clearTimeout(timeout);
-  }, [fallDuration, targetTime, delay]);
-
-  // If the position is -100, return null (don't render the dot)
-  if (position === -100) {
-    return null; // disappear
-  }
+  // Do not render the dot until it has spawned.
+  if (!spawned) return null;
 
   return (
     <div 

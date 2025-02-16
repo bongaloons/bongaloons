@@ -31,14 +31,18 @@ app.add_middleware(
 # Game settings
 T_FALL = 2.0
 DEFAULT_BPM = 120.0  # fallback BPM
+
 GAME_STATE = {
     "is_running": False,
+    "is_paused": False,         # Whether the game is currently paused
+    "pause_timestamp": None,    # Timestamp when pause started (in seconds)
+    "total_paused_time": 0,     # Total time (in seconds) the game has been paused
     "start_time": None,
     "game_duration": 0,
     "bpm": DEFAULT_BPM,
-    "songPath": "",   # Will hold the audio file path
-    "midiPath": "",   # Will hold the MIDI file path from the catalog
-    "songName": "",    # New: Name of the song from the catalog
+    "songPath": "",   # Audio file path
+    "midiPath": "",   # MIDI file path from the catalog
+    "songName": "",   # Name of the song from the catalog
     "total_score": 0,
     "current_streak": 0,
     "max_streak": 0
@@ -47,7 +51,7 @@ GAME_STATE = {
 
 def get_song_info_from_catalog(id: int) -> tuple:
     """
-    Reads catalog.json (in the same directory) and returns a tuple (bpm, songPath, midiPath, songName)
+    Reads catalog.json and returns a tuple (bpm, songPath, midiPath, songName)
     for the given id. If not found, returns (DEFAULT_BPM, "", "", "").
     """
     try:
@@ -67,9 +71,6 @@ def get_song_info_from_catalog(id: int) -> tuple:
 
 @app.get("/songs")
 async def get_songs() -> GetSongsResponse:
-    """
-    Reads catalog.json (in the same directory) and returns a list of Song objects.
-    """
     try:
         with open("catalog.json", "r") as f:
             catalog = json.load(f)
@@ -81,33 +82,29 @@ async def get_songs() -> GetSongsResponse:
 
 @app.post("/game/start")
 async def start_game(id: int = 0):
-    """
-    Initialize a new game session.
-    Loads the truth beatmap from the MIDI file and loads each note one-by-one into the global truth map.
-    Reads the BPM, song audio file path, MIDI path, and song name from catalog.json using the provided id.
-    Computes the game duration (2 seconds after the last truth note).
-    """
     # Get BPM, song path, MIDI path, and song name from catalog.json using id.
     bpm, song_path, midi_path, song_name = get_song_info_from_catalog(id)
     GAME_STATE["bpm"] = bpm
     GAME_STATE["songPath"] = song_path
     GAME_STATE["midiPath"] = midi_path
     GAME_STATE["songName"] = song_name
-    print(f"Using BPM from catalog: {bpm}, Song path: {song_path}, MIDI path: {midi_path}, Song name: {song_name}")
+    # Reset pause-related values.
+    GAME_STATE["is_paused"] = False
+    GAME_STATE["pause_timestamp"] = None
+    GAME_STATE["total_paused_time"] = 0
 
-    frontend_prefix = "../frontend/public"
-    # Parse the entire beatmap using the midiPath.
-    print(f"{frontend_prefix}{midi_path}")
+    print(f"Using BPM: {bpm}, Song path: {song_path}, MIDI path: {midi_path}, Song name: {song_name}")
 
-    truth_moves = parse_midi(f"{frontend_prefix}{midi_path}")
-    
+    frontend_prefix = "../frontend/public/"
+    full_midi_path = f"{frontend_prefix}{midi_path.lstrip('/')}"
+    print("Full MIDI path:", full_midi_path)
+
+    truth_moves = parse_midi(full_midi_path)
     global_truth_map.clear()
-    
     for move, notes in truth_moves.items():
         for note in notes:
             load_truth_note(move, note)
-    
-    # Determine game duration: 2 seconds after the last truth note among all moves.
+
     max_time = 0.0
     for notes in truth_moves.values():
         if notes:
@@ -119,7 +116,7 @@ async def start_game(id: int = 0):
     GAME_STATE["total_score"] = 0
     GAME_STATE["current_streak"] = 0
     GAME_STATE["max_streak"] = 0
-    
+
     falling_dots = [
         FallingDot(
             move=move,
@@ -139,40 +136,48 @@ async def start_game(id: int = 0):
         "songName": song_name
     }
 
+
 @app.websocket("/game/ws")
 async def game_websocket(websocket: WebSocket):
-    """
-    A live WebSocket endpoint.
-    
-    For each key event, it:
-      - Determines the move ("left" for 'a', "right" for 'l').
-      - Computes the current time relative to game start.
-      - Creates a hit Note.
-      - Calls score_live_note to score that hit against the next truth note in the global_truth_map.
-      - Sends back the judgement.
-    
-    When the current time reaches game_duration, any remaining truth notes are marked as MISS,
-    and the game is over.
-    """
     await websocket.accept()
     
     try:
         while True:
             data = await websocket.receive_json()
+            
+            # Ignore messages if game is not running.
             if not GAME_STATE["is_running"]:
                 continue
-                
-            current_time = time.perf_counter() - GAME_STATE["start_time"]
             
-            if data.get("key") in ["a", "l"]:
+            # Handle pause toggle message.
+            if data.get("type") == "toggle_pause":
+                print("hdfihdfidifhd")
+                if not GAME_STATE["is_paused"]:
+                    GAME_STATE["is_paused"] = True
+                    GAME_STATE["pause_timestamp"] = time.perf_counter()
+                    await websocket.send_json({"type": "pause_toggled", "status": "paused"})
+                else:
+                    paused_duration = time.perf_counter() - GAME_STATE["pause_timestamp"]
+                    GAME_STATE["total_paused_time"] += paused_duration
+                    GAME_STATE["is_paused"] = False
+                    GAME_STATE["pause_timestamp"] = None
+                    await websocket.send_json({"type": "pause_toggled", "status": "running"})
+                continue
+            
+            # Only process key events if not paused.
+            if GAME_STATE["is_paused"]:
+                continue
+            
+            # Compute effective current time (excluding paused duration)
+            current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
+            
+            if data.get("key") in ["a", "l"] and not GAME_STATE["is_paused"]:
                 move = "left" if data["key"] == "a" else "right"
                 hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
-                # Score the hit using score_live_note.
                 judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1/2)
                 
                 score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
                 GAME_STATE["total_score"] += score_delta
-                
                 if judgement in ["MISS", "OOPS"]:
                     GAME_STATE["current_streak"] = 0
                 else:
@@ -210,20 +215,20 @@ async def game_websocket(websocket: WebSocket):
     finally:
         await websocket.close()
 
+
 @app.get("/game/status")
 async def get_game_status() -> GameStatusResponse:
-    """Get current game status."""
     if not GAME_STATE["is_running"]:
         return GameStatusResponse(status="not_running")
         
-    current_time = time.perf_counter() - GAME_STATE["start_time"]
+    current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
     return GameStatusResponse(
         status="running",
         elapsed_time=current_time,
         total_duration=GAME_STATE["game_duration"]
     )
 
+
 @app.get("/health")
 async def health_check() -> HealthCheckResponse:
-    """Health check endpoint."""
     return HealthCheckResponse(status="ok")
