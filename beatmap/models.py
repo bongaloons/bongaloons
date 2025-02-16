@@ -8,6 +8,7 @@ class Song(BaseModel):
     path: str
     song: str
     bpm: int
+    difficulty: int
 
 class GetSongsResponse(BaseModel):
     songs: List[Song]

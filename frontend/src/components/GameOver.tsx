@@ -3,6 +3,7 @@ import { GameContext } from '../context/GameContext';
 import PushButton from './PushButton';
 import { playSoundFile } from '../utils/audioPlayer';
 import PushInput from './PushInput';
+import SquigglyText from './SquigglyText';
 
 // Rank thresholds and comments
 const RANK_THRESHOLDS = {
@@ -59,7 +60,7 @@ export default function GameOver() {
   return (
     <div className="fixed inset-0 w-screen h-screen bg-gradient-to-b from-[#FFB07C] to-[#E88165] overflow-hidden flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-lg text-center">
-        <h1 className="text-4xl font-display mb-4">Game Over!</h1>
+        <SquigglyText className="text-4xl font-display mb-4">Game Over!</SquigglyText>
         <div className="text-9xl font-display mb-4" style={{
           color: rank === 'SSS' ? 'gold' : 
                  rank === 'SS' ? '#FFC107' :

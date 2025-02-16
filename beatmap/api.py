@@ -72,8 +72,8 @@ async def shutdown_event():
 
 def get_song_info_from_catalog(id: int) -> tuple:
     """
-    Reads catalog.json and returns a tuple (bpm, songPath, midiPath, songName)
-    for the given id. If not found, returns (DEFAULT_BPM, "", "", "").
+    Reads catalog.json and returns a tuple (bpm, songPath, midiPath, songName, difficulty)
+    for the given id. If not found, returns (DEFAULT_BPM, "", "", "", 1).
     """
     try:
         with open("catalog.json", "r") as f:
@@ -84,10 +84,11 @@ def get_song_info_from_catalog(id: int) -> tuple:
                 song = entry.get("song", "")
                 midi_path = entry.get("path", "")
                 song_name = entry.get("name", "")
-                return bpm, song, midi_path, song_name
+                difficulty = entry.get("difficulty", 1)
+                return bpm, song, midi_path, song_name, difficulty
     except Exception as e:
         print(f"Error reading catalog.json: {e}")
-    return DEFAULT_BPM, "", "", ""
+    return DEFAULT_BPM, "", "", "", 1
 
 @app.get("/songs")
 async def get_songs() -> GetSongsResponse:
@@ -102,7 +103,7 @@ async def get_songs() -> GetSongsResponse:
 @app.post("/game/start")
 async def start_game(id: int = 0):
     # Get song info from catalog.json.
-    bpm, song_path, midi_path, song_name = get_song_info_from_catalog(id)
+    bpm, song_path, midi_path, song_name, difficulty = get_song_info_from_catalog(id)
     GAME_STATE["bpm"] = bpm
     GAME_STATE["songPath"] = song_path
     GAME_STATE["midiPath"] = midi_path
@@ -156,7 +157,8 @@ async def start_game(id: int = 0):
         "songPath": song_path,
         "midiPath": midi_path,
         "songName": song_name,
-        "bpm": GAME_STATE["bpm"]  # Added bpm field
+        "bpm": GAME_STATE["bpm"],
+        "difficulty": difficulty
     }
 
 async def process_hit(websocket: WebSocket, move: str, current_time: float):

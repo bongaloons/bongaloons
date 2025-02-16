@@ -1,14 +1,9 @@
 import { useContext, useEffect, useState } from 'react';
 import { GameContext } from '../context/GameContext';
 import PushButton from '../components/PushButton';
+import SquigglyText from '../components/SquigglyText';
+import SongCard, { Song } from './SongCard';
 
-interface Song {
-  id: number;
-  name: string;
-  path: string;
-  song: string;
-  bpm: number;
-}
 
 export default function SongSelect() {
   const { startGame, setShowSongSelect } = useContext(GameContext);
@@ -40,18 +35,14 @@ export default function SongSelect() {
 
   return (
     <div className="w-screen h-screen bg-gradient-to-b from-[#FFB07C] to-[#E88165] flex flex-col items-center justify-center gap-8">
-      <div className="p-8 bg-white rounded-lg shadow-md w-1/2">
-        <h1 className="text-6xl text-black mb-8 font-display">Select a Song</h1>
-        <div className="flex flex-col gap-4 w-96">
-          {songs.map(song => (
-            <PushButton
-              align="left"
-              key={song.id}
-              onClick={() => startGame(song.id)}
-            >
-              {song.name}
-            </PushButton>
-          ))}
+      <div className="p-8 bg-white rounded-lg shadow-md w-1/2 flex flex-col gap-2">
+        <SquigglyText className="text-6xl text-black font-display">Select a Song</SquigglyText>
+        <div className="flex flex-col gap-4">
+          <div className="max-h-[400px] mx-[-20px] w-[calc(100%+40px)] overflow-y-auto px-6 py-4 mb-4">
+            {songs.map(song => (
+              <SongCard key={song.id} song={song} startGame={startGame} />
+            ))}
+          </div>
           <PushButton
             onClick={() => setShowSongSelect(false)}
             color="black"
