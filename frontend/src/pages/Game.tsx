@@ -357,6 +357,16 @@ function Game() {
       >
           <Track position="right" text="Right Track (L)" />
       </div>
+      <div 
+        className="w-24.5 h-[60%] fixed bottom-[-9.5%] right-[52.3%] z-1 overflow-hidden"
+        style={{
+          transform: "rotate(13deg)",
+          transformOrigin: "bottom center",
+          background: "linear-gradient(to top, #de301a, #fe308a)"
+        }}
+      >
+          <Track position="super" text="Super Track (Gesture)" />
+      </div>
     </div>
   )
 }

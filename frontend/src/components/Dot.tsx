@@ -3,25 +3,32 @@ import { GameContext } from '../context/GameContext';
 
 interface DotProps {
   targetTime: number;  // Time (ms) when the dot is meant to be hit
+  track: 'left' | 'right' | 'super';
 }
 
-const Dot: FC<DotProps> = ({ targetTime }) => {
+const Dot: FC<DotProps> = ({ targetTime, track }) => {
   const dotStartPosition = 0;
-  const { gameState } = useContext(GameContext);
+  const { gameState, ws } = useContext(GameContext);
   const [position, setPosition] = useState(dotStartPosition);
   const [isSprite] = useState(() => Math.random() < 0.4);
+  
+  // Choose a color: for the "super" track, always rainbow; for left/right, pick from a set.
   const [color] = useState(() => {
-    const colors = [
-      '#FF4444', // bright red
-      '#00FFE5', // bright teal
-      '#00BFFF', // bright blue
-      '#66FF99', // bright green
-      '#FFFF66', // bright yellow
-      '#FF99CC', // bright pink
-      '#B266FF', // bright purple
-      '#FF9933', // bright orange
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
+    if (track === 'super') {
+      return 'rainbow';
+    } else {
+      const colors = [
+        '#FF4444', // bright red
+        '#00FFE5', // bright teal
+        '#00BFFF', // bright blue
+        '#66FF99', // bright green
+        '#FFFF66', // bright yellow
+        '#FF99CC', // bright pink
+        '#B266FF', // bright purple
+        '#FF9933', // bright orange
+      ];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
   });
 
   // Always get the latest gameState via a ref.
@@ -62,9 +69,6 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
     const spawnTime = targetTime - gameState.fallDuration + gameState.delay + gameState.reactionTime;
     const checkSpawn = () => {
       // Compute effective time:
-      // elapsed time = current time - game start time
-      // then subtract both the totalPausedTime from earlier pauses and the
-      // accumulated pause time for the current pause.
       const effectiveTime = gameState.startTime
         ? performance.now() - gameState.startTime - gameState.totalPausedTime - pauseAccumulator
         : 0;
@@ -84,6 +88,8 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
   ]);
 
   const [hasHitLine, setHasHitLine] = useState(false);
+  // New state: ensure we send the super note message only once.
+  const [superSent, setSuperSent] = useState(false);
   
   // Effect to animate the dot once it has spawned.
   useEffect(() => {
@@ -94,6 +100,15 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
         if (prev >= limit) {
           if (prev === limit && !hasHitLine) {
             setHasHitLine(true);
+            // If this is a super note, send out a "super_detected" message.
+            if (track === 'super' && !superSent && ws) {
+              ws.send(JSON.stringify({
+                type: "super_detected",
+                message: "Super note reached limit",
+                noteTargetTime: targetTime,
+              }));
+              setSuperSent(true);
+            }
             setTimeout(() => {
               setPosition(limit + 0.01);
             }, 50);
@@ -108,7 +123,7 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
     };
     const interval = setInterval(animate, 50);
     return () => clearInterval(interval);
-  }, [spawned, gameState.fallDuration, hasHitLine]);
+  }, [spawned, gameState.fallDuration, hasHitLine, track, ws, superSent, targetTime]);
 
   // Log the dot's x and y coordinates whenever position updates.
   useEffect(() => {
@@ -125,6 +140,18 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
   const scale = position >= 75 ? 1 + ((position - 75) / 10) * 0.5 : 1;
   const opacity = hasHitLine ? 0 : 1;
 
+  // Use conic gradient for a rainbow dot (for "super" track) and a radial gradient for others.
+  const background = color === 'rainbow'
+    ? 'conic-gradient(red, orange, yellow, green, blue, indigo, violet, red)'
+    : `radial-gradient(circle at 30% 30%, ${color}ee, ${color}aa, ${color}88)`;
+  
+  const boxShadow = color === 'rainbow'
+    ? '0 0 10px rgba(255,255,255,0.8)'
+    : `0 0 10px ${color}66`;
+
+  // For rainbow dots, add a slow rotation based on the dot's position.
+  const rotation = color === 'rainbow' ? position * 2 : 0; // 2 degrees per percent advanced
+
   return (
     <div 
       ref={dotRef}
@@ -134,12 +161,12 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
         left: "25%",
         width: "80px",
         height: "80px",
-        background: `radial-gradient(circle at 30% 30%, ${color}ee, ${color}aa, ${color}88)`,
-        boxShadow: `0 0 10px ${color}66`,
+        background,
+        boxShadow,
         transition: hasHitLine ? 
           'bottom 0.05s linear, opacity 0.05s linear, transform 0.05s linear' : 
           'bottom 0.05s linear, transform 0.05s linear',
-        transform: `scale(${scale})`,
+        transform: `scale(${scale}) rotate(${rotation}deg)`,
         opacity,
         border: isSprite ? 'none' : '4px solid black'
       }}
