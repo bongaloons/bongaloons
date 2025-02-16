@@ -55,26 +55,29 @@ def detect_hand_position(frame, hands, mp_hands, mp_drawing):
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = hands.process(frame_rgb)
     positions = [None, None]
-    if results.multi_hand_landmarks and results.multi_handedness:
-        for idx, (hand_landmarks, handedness) in enumerate(zip(results.multi_hand_landmarks, results.multi_handedness)):
 
-            # Extract x and y coords of all 21 hand landmarks
-            x_vals = [lm.x for lm in hand_landmarks.landmark]
-            y_vals = [lm.y for lm in hand_landmarks.landmark]
+    # if results.multi_hand_landmarks and results.multi_handedness:
+    print(f"Multi hand landmarks: {results.multi_hand_landmarks}")
 
-            # Get average hand position
-            hand_x = np.mean(x_vals)
-            hand_y = np.mean(y_vals)
+    for idx, (hand_landmarks, handedness) in enumerate(zip(results.multi_hand_landmarks, results.multi_handedness)):
 
-            # Determine region
-            position = "Middle"
-            if hand_y < TOP_THRESHOLD:
-                position = "Top"
-            elif hand_y > BOTTOM_THRESHOLD:
-                position = "Bottom"
+        # Extract x and y coords of all 21 hand landmarks
+        x_vals = [lm.x for lm in hand_landmarks.landmark]
+        y_vals = [lm.y for lm in hand_landmarks.landmark]
 
-            # Left hand position, then right hand position
-            positions[idx] = position
+        # Get average hand position
+        hand_x = np.mean(x_vals)
+        hand_y = np.mean(y_vals)
+
+        # Determine region
+        position = "Middle"
+        if hand_y < TOP_THRESHOLD:
+            position = "Top"
+        elif hand_y > BOTTOM_THRESHOLD:
+            position = "Bottom"
+
+        # Left hand position, then right hand position
+        positions[idx] = position
 
     return positions
 
@@ -140,8 +143,8 @@ def main():
     cap = cv2.VideoCapture(0)
 
     # Test hand position
-    test_hand_position_live(cap, hands, mp_hands, mp_drawing)
-    # test_check_hand_position("test.bin")
+    # test_hand_position_live(cap, hands, mp_hands, mp_drawing)
+    test_check_hand_position("test.bin")
 
     cap.release()
     cv2.destroyAllWindows()
