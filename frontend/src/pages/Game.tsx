@@ -1,16 +1,42 @@
 import '../App.css'
 import Track from '../components/Track'
-import { useContext } from 'react'
+import { useContext, useEffect, useRef } from 'react'
 import { GameContext } from '../context/GameContext'
 import Judegment from '../components/Judegment';
 import Table from '../components/cosmetics/Table';
 import BongoCat from '../components/BongoCat';
 
 function Game() {
-  const { gameState, startGame } = useContext(GameContext);
+  const { gameState, startGame } = useContext(GameContext)
+  // Create a ref for the audio element.
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    if (gameState.isRunning) {
+      console.log("Game is running. Song path:", gameState.songPath);
+      // Delay audio playback by 2000ms
+      const timer = setTimeout(() => {
+        audioRef.current = new Audio(gameState.songPath);
+        audioRef.current.play().catch((err) =>
+          console.error("Audio play error:", err)
+        );
+      }, 1500);
+      return () => clearTimeout(timer);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+    }
+  }, [gameState.isRunning, gameState.songPath]);  
 
   return (
+
+
     <div className="fixed inset-0 w-screen h-screen bg-[#E9967A] overflow-hidden">
+        <div className="absolute top-16 text-white z-20 font-display justify-center">
+          {gameState.songName && <div>Now playing: {gameState.songName}</div>}
+        </div>
       <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-white z-20 font-display ${
         gameState.connectionStatus === 'connected' ? 'bg-green-500' :
         gameState.connectionStatus === 'connecting' ? 'bg-yellow-500' :

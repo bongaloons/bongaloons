@@ -5,6 +5,9 @@ type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 interface GameState {
   isRunning: boolean;
+  songPath: string;
+  mapPath: string;      // New: Path of the MIDI file
+  songName: string;     // New: Name of the song
   currentPose: Pose;
   fallingDots: Array<{
     move: string;
@@ -38,6 +41,9 @@ export const GameContext = createContext<GameContextType>({
   isStarted: false,
   gameState: {
     isRunning: false,
+    songPath: "",
+    mapPath: "",
+    songName: "",
     currentPose: "idle",
     fallingDots: [],
     connectionStatus: 'disconnected',
@@ -57,6 +63,9 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   const [isStarted, setIsStarted] = useState(false);
   const [gameState, setGameState] = useState<GameState>({
     isRunning: false,
+    songPath: "",
+    mapPath: "",
+    songName: "",
     currentPose: "idle",
     fallingDots: [],
     connectionStatus: 'disconnected',
@@ -68,7 +77,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
   const updatePose = (pose: Pose) => {
     setGameState(prev => ({ ...prev, currentPose: pose }));
-  }
+  };
 
   const startGame = async () => {
     setIsStarted(true);
@@ -92,7 +101,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         
         try {
           console.log('Starting game...');
-          const response = await fetch('http://127.0.0.1:8000/game/start?midi_file=jellyfish.mid', {
+          const response = await fetch('http://127.0.0.1:8000/game/start?id=0', {
             method: 'POST',
           });
           
@@ -105,6 +114,9 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           setGameState(prev => ({
             ...prev,
             isRunning: true,
+            songPath: data.songPath,     // Updated field from API
+            mapPath: data.midiPath,      // New field from API
+            songName: data.songName,     // New field from API (if provided)
             fallingDots: data.falling_dots
           }));
         } catch (error) {
@@ -135,20 +147,20 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       newWs.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.type === "hit_registered") {
-            setGameState(prev => ({
-                ...prev,
-                lastJudgement: data.lastJudgement,
-                totalScore: data.totalScore,
-            }));
+          setGameState(prev => ({
+            ...prev,
+            lastJudgement: data.lastJudgement,
+            totalScore: data.totalScore,
+          }));
         } else if (data.type === "game_over") {
-            setGameState(prev => ({
-                ...prev,
-                scores: data.scores,
-                lastJudgement: data.lastJudgement,
-                totalScore: data.totalScore,
-                isRunning: false
-            }));
-            setIsStarted(false);
+          setGameState(prev => ({
+            ...prev,
+            scores: data.scores,
+            lastJudgement: data.lastJudgement,
+            totalScore: data.totalScore,
+            isRunning: false
+          }));
+          setIsStarted(false);
         }
         console.log('Game state updated:', data);
       };
@@ -235,4 +247,4 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </GameContext.Provider>
   );
-}; 
+};
