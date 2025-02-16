@@ -76,6 +76,7 @@ docs/_build/
 target/
 
 **/videos
+**/uploads
 
 # Jupyter Notebook
 .ipynb_checkpoints

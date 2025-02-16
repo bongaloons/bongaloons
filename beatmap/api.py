@@ -361,3 +361,129 @@ async def upload_video_segment(
     except Exception as e:
         print(f"Error saving video: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/beatmap/create")
+async def create_beatmap(
+    audio: UploadFile = File(...),
+    max_notes: int = 100
+):
+    """
+    Creates a beatmap from an uploaded MP3 file.
+    Returns the generated MIDI file path and other metadata.
+    """
+    # Create uploads directory if it doesn't exist
+    os.makedirs("../frontend/public/uploads", exist_ok=True)
+    
+    difficulty = 1
+    if max_notes > 50:
+        difficulty = 2
+    elif max_notes > 100:
+        difficulty = 3
+    elif max_notes > 150:
+        difficulty = 4
+    elif max_notes > 200:
+        difficulty = 5
+        
+    # Save the uploaded MP3
+    timestamp = int(time.time())
+    mp3_filename = f"upload_{timestamp}.mp3"
+    midi_filename = f"upload_{timestamp}.mid"
+    
+    mp3_path = f"../frontend/public/uploads/{mp3_filename}"
+    midi_path = f"../frontend/public/uploads/{midi_filename}"
+    
+    try:
+        # Save MP3
+        content = await audio.read()
+        with open(mp3_path, "wb") as f:
+            f.write(content)
+            
+        # Process audio to create MIDI
+        from make_beatmap import process_audio_to_midi
+        bpm = process_audio_to_midi(mp3_path, midi_path, max_notes)
+        
+        # Get song name from the original filename, removing the extension
+        song_name = audio.filename.rsplit('.', 1)[0] if audio.filename else f"Custom Song {timestamp}"
+        
+        # Read and validate catalog
+        catalog = []
+        try:
+            with open("catalog.json", "r") as f:
+                content = f.read().strip()
+                # Check if the content ends with a proper closing bracket
+                if content and content[-1] == ']':
+                    try:
+                        catalog = json.loads(content)
+                    except json.JSONDecodeError:
+                        # If parsing fails, start with default catalog
+                        catalog = [
+                            {
+                                "id": 0,
+                                "name": "The Cha Cha Slide (Easy)",
+                                "path": "songmaps/chacha.mid",
+                                "song": "songs/chacha.mp3",
+                                "bpm": 122,
+                                "difficulty": 2
+                            }
+                        ]
+        except FileNotFoundError:
+            # If file doesn't exist, start with default catalog
+            catalog = [
+                {
+                    "id": 0,
+                    "name": "The Cha Cha Slide (Easy)",
+                    "path": "songmaps/chacha.mid",
+                    "song": "songs/chacha.mp3",
+                    "bpm": 122,
+                    "difficulty": 2
+                }
+            ]
+            
+        # Find max ID from valid entries
+        max_id = 0
+        for entry in catalog:
+            if isinstance(entry, dict) and 'id' in entry:
+                max_id = max(max_id, entry['id'])
+        
+        # Create new catalog entry
+        new_entry = {
+            "id": max_id + 1,
+            "name": song_name,
+            "path": f"/uploads/{midi_filename}",
+            "song": f"/uploads/{mp3_filename}",
+            "bpm": int(bpm) if isinstance(bpm, (int, float)) else int(bpm[0]),
+            "difficulty": difficulty
+        }
+        
+        # Remove any incomplete entries
+        catalog = [entry for entry in catalog if isinstance(entry, dict) and all(
+            key in entry for key in ['id', 'name', 'path', 'song', 'bpm', 'difficulty']
+        )]
+        
+        catalog.append(new_entry)
+        
+        # Write the updated catalog with proper formatting
+        # Use a temporary file to ensure atomic write
+        temp_path = "catalog.json.tmp"
+        with open(temp_path, "w") as f:
+            json.dump(catalog, f, indent=4)
+        
+        # Atomic rename to prevent corruption
+        os.replace(temp_path, "catalog.json")
+            
+        return {
+            "status": "success",
+            "song": new_entry
+        }
+        
+    except Exception as e:
+        # Clean up files if there was an error
+        try:
+            if os.path.exists(mp3_path):
+                os.remove(mp3_path)
+            if os.path.exists(midi_path):
+                os.remove(midi_path)
+        except:
+            pass
+        print(f"Error creating beatmap: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

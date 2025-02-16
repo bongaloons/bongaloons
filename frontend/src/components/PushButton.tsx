@@ -4,6 +4,7 @@ interface PushButtonProps {
   className?: string;
   color?: 'white' | 'black';
   align?: 'center' | 'left' | 'right';
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export default function PushButton({ 
@@ -11,7 +12,8 @@ export default function PushButton({
   children, 
   className = '',
   color = 'white',
-  align = 'center'
+  align = 'center',
+  size = 'md'
 }: PushButtonProps) {
   const colorStyles = {
     white: {
@@ -38,8 +40,8 @@ export default function PushButton({
       style={colorStyles[color].vars}
       className={`
         relative 
-        px-6 py-3
-        text-2xl font-bold font-display
+        ${size === 'sm' ? 'px-4 py-2 text-lg' : 'px-6 py-3 text-2xl'}
+        font-bold font-display
         rounded-md border-0
         transition-all duration-200
         ${colorStyles[color].button}

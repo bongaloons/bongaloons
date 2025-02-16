@@ -5,7 +5,7 @@ from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
 MAX_NOTES = 100 # Default maximum notes in the final MIDI file
 
 
-def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES):
+def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES) -> float:
     # --- Step 1: Load the audio and determine BPM ---
     # sr=None preserves the native sample rate.
     y, sr = librosa.load(input_mp3, sr=22050)
@@ -84,6 +84,7 @@ def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES):
     
     mid.save(output_midi)
     print(f"MIDI file saved as {output_midi}")
+    return tempo
 
 
 if __name__ == '__main__':
