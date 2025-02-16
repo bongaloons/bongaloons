@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple
 from score import Judgement
 
 # Mapping from MIDI pitch to move name.
-pitch_to_move = {67: "left", 72: "right"}
+pitch_to_move = {67: "left", 72: "right", 79: "super"}
 
 @dataclass
 class Note:
