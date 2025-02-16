@@ -1,6 +1,6 @@
 import '../App.css'
 import Track from '../components/Track'
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState} from 'react'
 import { GameContext } from '../context/GameContext'
 import Judgement from '../components/Judgement';
 import Table from '../components/cosmetics/Table';
@@ -105,6 +105,100 @@ function Game() {
   
 
   // Now you can use the "audioReady" flag in your note/update logic.
+
+    // Refs for video recording
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const videoStreamRef = useRef<MediaStream | null>(null);
+    const recordedChunksRef = useRef<Blob[]>([]);
+    const [isRecording, setIsRecording] = useState(false);
+    const [startTime, setStartTime] = useState<number | null>(null);
+    const [endTime, setEndTime] = useState<number | null>(null);
+
+    // Start recording video
+
+    /** Start Recording Continuously */
+    useEffect(() => {
+      async function startContinuousRecording() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+            audio: false,
+          });
+
+          videoStreamRef.current = stream;
+          recordedChunksRef.current = [];
+
+          const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+          mediaRecorderRef.current = recorder;
+
+          recorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              recordedChunksRef.current.push(event.data); // Store chunks continuously
+            }
+          };
+
+          recorder.start(100); // Save small chunks every 100ms
+          setIsRecording(true);
+        } catch (error) {
+          console.error("Error accessing camera:", error);
+        }
+      }
+
+      startContinuousRecording();
+
+      return () => stopRecording();
+    }, []);
+    
+    /** Stop Recording (when unmounting or game ends) */
+    const stopRecording = () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      if (videoStreamRef.current) {
+        videoStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      setIsRecording(false);
+    };
+    /** Track when to extract video */
+    useEffect(() => {
+      if (gameState.isRunning && !gameState.isPaused) {
+        setStartTime(Date.now()); // Set when audio starts
+      } else if (!gameState.isRunning) {
+        setEndTime(Date.now()); // Set when audio stops
+        if (startTime) {
+          saveSegmentAsBinary(startTime, Date.now());
+        }
+      }
+    }, [gameState.isRunning, gameState.isPaused]);
+
+    const saveSegmentAsBinary = async (start: number, end: number) => {
+        if (!recordedChunksRef.current.length) return;
+
+        // Convert all chunks to a single Blob
+        const fullBlob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+
+        // Create a FileReader to extract portion of video
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(fullBlob);
+        reader.onload = async () => {
+          const fullBuffer = reader.result as ArrayBuffer;
+          const duration = (end - start) / 1000; // Convert to seconds
+
+          // Trim the video (not natively supported in JS, so sending full video for backend to trim)
+          const byteArray = new Uint8Array(fullBuffer);
+          const binBlob = new Blob([byteArray], { type: "application/octet-stream" });
+
+          // Download the .bin file (replace this with API upload if needed)
+          const url = URL.createObjectURL(binBlob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `segment_${start}_${end}.bin`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+      };
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-[#E9967A] overflow-hidden">
