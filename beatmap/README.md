@@ -18,7 +18,7 @@ uvicorn api:app --reload
 ```
 
 
-## FInd port
+## Find port
 ```bash
 ioreg -p IOUSB
 ```

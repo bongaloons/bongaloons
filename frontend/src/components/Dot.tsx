@@ -2,14 +2,13 @@ import { FC, useEffect, useState, useContext, useRef } from 'react';
 import { GameContext } from '../context/GameContext';
 
 interface DotProps {
-  delay: number;       // Initial delay (ms) before the dot should appear (relative to game timeline)
   targetTime: number;  // Time (ms) when the dot is meant to be hit
-  fallDuration: number; // Duration (ms) for the dot to fall from its spawn position to the target
 }
 
-const Dot: FC<DotProps> = ({ delay, targetTime, fallDuration }) => {
+const Dot: FC<DotProps> = ({ targetTime }) => {
+  const dotStartPosition = 0;
   const { gameState } = useContext(GameContext);
-  const [position, setPosition] = useState(-100);
+  const [position, setPosition] = useState(dotStartPosition);
   const [isSprite] = useState(() => Math.random() < 0.4);
   const [color] = useState(() => {
     const colors = [
@@ -25,95 +24,121 @@ const Dot: FC<DotProps> = ({ delay, targetTime, fallDuration }) => {
     return colors[Math.floor(Math.random() * colors.length)];
   });
 
-  const [sprite] = useState(() => {
-    const sprites = ['chicken.png', 'chip.png', 'toy.png', 'tree.png', 'yarn.png'];
-    return sprites[Math.floor(Math.random() * sprites.length)];
-  });
-
   // Always get the latest gameState via a ref.
   const gameStateRef = useRef(gameState);
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
 
-  // Ref to hold the effective game time (time elapsed that doesn't advance when paused)
-  const effectiveTimeRef = useRef(0);
+  /**
+   * When the game is paused, we want to increment the pause duration
+   * continuously so that effective time (used to spawn dots) does not
+   * advance during a pause.
+   */
+  const [pauseAccumulator, setPauseAccumulator] = useState(0);
+  useEffect(() => {
+    let pauseInterval: NodeJS.Timeout;
+    if (gameState.isPaused) {
+      const pauseStart = performance.now();
+      pauseInterval = setInterval(() => {
+        setPauseAccumulator(() => performance.now() - pauseStart);
+      }, 50);
+    } else {
+      // Reset the local pause accumulator when unpaused.
+      setPauseAccumulator(0);
+    }
+    return () => clearInterval(pauseInterval);
+  }, [gameState.isPaused]);
 
   // Local state to determine when to spawn (i.e. start animation)
   const [spawned, setSpawned] = useState(false);
 
+  // Ref for the dot element to log its position.
+  const dotRef = useRef<HTMLDivElement>(null);
+
   // Effect to update effective time and check for spawn.
   useEffect(() => {
     // Calculate the intended spawn time (ms)
-    const spawnTime = targetTime - fallDuration + delay;
+    const spawnTime = targetTime - gameState.fallDuration + gameState.delay;
     const checkSpawn = () => {
-      // Compute effective time: subtract totalPausedTime from elapsed time.
-      const effectiveTime = gameState.startTime 
-        ? performance.now() - gameState.startTime - gameState.totalPausedTime 
+      // Compute effective time:
+      // elapsed time = current time - game start time
+      // then subtract both the totalPausedTime from earlier pauses and the
+      // accumulated pause time for the current pause.
+      const effectiveTime = gameState.startTime
+        ? performance.now() - gameState.startTime - gameState.totalPausedTime - pauseAccumulator
         : 0;
-        // console.log("Paused time:", gameState.totalPausedTime );
-        // console.log("Effective time:", effectiveTime );
-        if (effectiveTime >= spawnTime) {
+      if (effectiveTime >= spawnTime) {
         setSpawned(true);
       }
     };
     const intervalId = setInterval(checkSpawn, 50);
     return () => clearInterval(intervalId);
-  }, [delay, targetTime, fallDuration, gameState.startTime, gameState.totalPausedTime]);
-  
+  }, [
+    gameState.delay, 
+    targetTime, 
+    gameState.fallDuration, 
+    gameState.startTime, 
+    gameState.totalPausedTime,
+    pauseAccumulator,
+  ]);
 
   // Effect to animate the dot once it has spawned.
   useEffect(() => {
     if (!spawned) return;
     const animate = () => {
       setPosition(prev => {
-        if (prev >= 100) return 100;
-        const totalDistance = 200;
+        const limit = 80;
+        if (prev >= limit) {
+          if (prev !== limit) {
+            console.log("Dot hit the line!");
+          }
+          return limit;
+        }
+        const totalDistance = limit - dotStartPosition;
         // Use the latest pause status from our ref.
         const isPaused = gameStateRef.current.isPaused;
-        const speedPer50ms = isPaused ? 0 : (totalDistance / fallDuration) * 50;
+        // When paused, don't move the dot.
+        const speedPer50ms = isPaused ? 0 : (totalDistance / gameState.fallDuration) * 50;
         return prev + speedPer50ms;
       });
     };
     const interval = setInterval(animate, 50);
     return () => clearInterval(interval);
-  }, [spawned, fallDuration]);
+  }, [spawned, gameState.fallDuration]);
+
+  // Log the dot's x and y coordinates whenever position updates.
+  useEffect(() => {
+    if (dotRef.current) {
+      const rect = dotRef.current.getBoundingClientRect();
+      console.log(`Dot position - x: ${rect.x.toFixed(2)}, y: ${rect.y.toFixed(2)}`);
+    }
+  }, [position]);
 
   // Do not render the dot until it has spawned.
   if (!spawned) return null;
 
   return (
     <div 
+      ref={dotRef}
       className="absolute rounded-full"
       style={{
         bottom: `${position}%`,
-        left: "5%",
-        width: "150px",
-        height: "150px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        left: "25%", // Adjust as needed to center in track
+        width: "80px",
+        height: "80px",
+        background: `radial-gradient(circle at 30% 30%, ${color}ee, ${color}aa, ${color}88)`,
+        boxShadow: `0 0 10px ${color}66`,
+        transition: 'bottom 0.05s linear'
       }}
     >
-      <div
-        className="rounded-full"
-        style={{
-          width: "80px",
-          height: "80px",
-          background: `radial-gradient(circle at 30% 30%, ${color}ee, ${color}aa, ${color}88)`,
-          boxShadow: `0 0 10px ${color}66`,
-          transition: 'bottom 0.05s linear',
-          border: isSprite ? 'none' : '4px solid rgba(0, 0, 0, 0.8)',
-        }}
-      />
-      
       {isSprite && (
         <div
           className="absolute"
           style={{
             width: "100%",
             height: "100%",
-            backgroundImage: `url(/dots/${sprite})`,
+            backgroundImage: `url(/dots/chicken.png)`,
             backgroundSize: 'contain',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
