@@ -162,7 +162,7 @@ function Game() {
       {/* Score & Streak display */}
       <div className="absolute flex flex-col gap-2 top-4 left-4 z-20">
         <div className="flex flex-row gap-2 px-4 py-2 bg-white rounded-lg shadow-lg justify-between items-center">
-          <button
+        <button
             onClick={() => {
               togglePause()
               if (ws) {
