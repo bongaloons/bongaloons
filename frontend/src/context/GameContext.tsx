@@ -24,6 +24,7 @@ interface GameState {
   totalScore: number | null;
   currentStreak: number | null;
   maxStreak: number | null;
+  shouldSaveSegment: boolean;
   scores: {
     [key: string]: Array<{
       truth_time: number | null;
@@ -72,6 +73,7 @@ export const GameContext = createContext<GameContextType>({
     totalScore: null,
     currentStreak: null,
     maxStreak: null,
+    shouldSaveSegment: false,
     pressedKeys: new Set<string>(),
     fallDuration: DEFAULT_FALL_DURATION,
     delay: DEFAULT_DELAY,
@@ -107,6 +109,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     totalScore: null,
     currentStreak: null,
     maxStreak: null,
+    shouldSaveSegment: false,
     pressedKeys: new Set<string>(),
     fallDuration: DEFAULT_FALL_DURATION,
     delay: DEFAULT_DELAY,

@@ -64,6 +64,8 @@ db.sqlite3-journal
 instance/
 .webassets-cache
 
+dump.rdb
+
 # Scrapy stuff:
 .scrapy
 
@@ -72,6 +74,8 @@ docs/_build/
 
 # PyBuilder
 target/
+
+**/videos
 
 # Jupyter Notebook
 .ipynb_checkpoints

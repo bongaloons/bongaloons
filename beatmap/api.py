@@ -1,7 +1,8 @@
 import json
 import time
 import asyncio
-from fastapi import FastAPI, WebSocket
+import os
+from fastapi import FastAPI, WebSocket, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from midi import (
     parse_midi,
@@ -323,3 +324,34 @@ async def add_to_leaderboard(name: str, score: int, max_streak: int):
 async def get_top_scores():
     scores = get_leaderboard()
     return {"scores": scores}
+
+
+@app.post("/video/upload")
+async def upload_video_segment(
+    start: int,
+    end: int,
+    video: UploadFile = File(...)
+):
+    """
+    Receives video segments from the frontend and saves them for processing.
+    start: timestamp when segment starts (ms)
+    end: timestamp when segment ends (ms)
+    """
+    # Create videos directory if it doesn't exist
+    os.makedirs("videos", exist_ok=True)
+    
+    # Generate unique filename using timestamps
+    filename = f"videos/segment_{start}_{end}.bin"
+    print(f"Saving to file: {filename}")
+    
+    # Save the uploaded file
+    try:
+        contents = await video.read()
+        print(f"Read {len(contents)} bytes from upload")
+        with open(filename, "wb") as f:
+            f.write(contents)
+        print("File saved successfully")
+        return {"status": "success", "filename": filename}
+    except Exception as e:
+        print(f"Error saving video: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
