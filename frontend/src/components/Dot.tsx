@@ -59,7 +59,7 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
   // Effect to update effective time and check for spawn.
   useEffect(() => {
     // Calculate the intended spawn time (ms)
-    const spawnTime = targetTime - gameState.fallDuration + gameState.delay;
+    const spawnTime = targetTime - gameState.fallDuration + gameState.delay + gameState.reactionTime;
     const checkSpawn = () => {
       // Compute effective time:
       // elapsed time = current time - game start time
