@@ -4,6 +4,7 @@ import { Pose } from "../types";
 import { GameContext } from "../context/GameContext";
 import PushButton from "../components/PushButton";
 import DvdLogo from "../components/cosmetics/DvdLogo";
+import Leaderboard from "../components/Leaderboard";
 
 const GIFS = [
     'gallery/cat-jump.gif',
@@ -23,6 +24,7 @@ export default function TitleScreen() {
     const { setShowSongSelect } = useContext(GameContext);
     const PADDING = 50; // pixels from the edge where cats can't spawn
     const [currentGif, setCurrentGif] = useState<string>(GIFS[0]);
+    const [showLeaderboard, setShowLeaderboard] = useState(false);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -183,8 +185,8 @@ export default function TitleScreen() {
                                 Settings
                             </PushButton>
                         </div>
-                        <PushButton color="black" align="right" className="z-20">
-                            View Leaderboard
+                        <PushButton color="black" align="right" className="z-20" onClick={() => setShowLeaderboard(!showLeaderboard)}>
+                            {showLeaderboard ? "Hide Leaderboard" : "View Leaderboard"}
                         </PushButton>
                     </div>
                 </div>
@@ -206,7 +208,13 @@ export default function TitleScreen() {
             ))}
 
             <div className="flex items-center justify-center w-[800px] p-4 bg-white rounded-lg h-screen">
-                <img src={currentGif} className="w-full" />
+                {showLeaderboard ? (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <Leaderboard onClose={() => setShowLeaderboard(false)} />
+                    </div>
+                ) : (
+                    <img src={currentGif} className="w-full" />
+                )}
             </div>
 
         </div>
