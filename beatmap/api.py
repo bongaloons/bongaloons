@@ -182,6 +182,7 @@ async def process_hit(websocket: WebSocket, move: str, current_time: float):
         "scoreDelta": score_delta
     })
 
+
 async def handle_game_over(websocket: WebSocket, current_time: float):
     """Helper function to handle game over state"""
     for move in list(global_truth_map.keys()):
@@ -212,7 +213,7 @@ async def game_status_checker(websocket: WebSocket):
             await asyncio.sleep(0.05)
             continue
         current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
-        print("Effective time:", current_time, "Game duration + T_END:", GAME_STATE["game_duration"] + T_END)
+        # print("Effective time:", current_time, "Game duration + T_END:", GAME_STATE["game_duration"] + T_END)
         if current_time >= GAME_STATE["game_duration"] + T_END:
             await websocket.send_json({
                 "type": "game_over",
@@ -257,6 +258,11 @@ async def game_status_checker(websocket: WebSocket):
 
 @app.websocket("/game/ws")
 async def game_websocket(websocket: WebSocket):
+    tflite_save_path = "./model/model_doubleTrue.tflite" 
+    interpreter, input_details, output_details = setup_model(tflite_save_path)
+    mp_hands = mp.solutions.hands
+    # Handle pause toggle message.
+    hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
     await websocket.accept()
     game_checker_task = asyncio.create_task(game_status_checker(websocket))
     try:
@@ -279,7 +285,14 @@ async def game_websocket(websocket: WebSocket):
             if not GAME_STATE["is_running"]:
                 continue
 
-            # Handle pause toggle message.
+            print("Received data:", data)  # Debug print statement to log received data
+            if data["type"] == "super_detected":
+                #TODO: grab some random segment and set segment_path to that
+                path = "videos/test_double.bin"
+                print("Super note detected:", data)  # Additional debug print statement
+                left, right = check_hand_position_api(path, hands, mp_hands, interpreter, input_details, output_details, use_double=False)
+                await websocket.send_json({"left": left, "right": right})
+            
             if data and data.get("type") == "toggle_pause":
                 if not GAME_STATE["is_paused"]:
                     GAME_STATE["is_paused"] = True
@@ -302,7 +315,7 @@ async def game_websocket(websocket: WebSocket):
                 move = "left" if data["key"] == "a" else "right"
                 await process_hit(websocket, move, current_time)
             
-            print("hello", current_time, GAME_STATE["game_duration"] + T_END)
+            # print("hello", current_time, GAME_STATE["game_duration"] + T_END)
 
             if current_time >= GAME_STATE["game_duration"] + T_END:
                 await handle_game_over(websocket, current_time)
@@ -370,21 +383,3 @@ async def upload_video_segment(
     except Exception as e:
         print(f"Error saving video: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.on_event("startup")
-async def startup_event(use_double=False):
-    global interpreter, input_details, output_details
-    tflite_save_path = "./model/model_doubleTrue.tflite" if use_double else "./model/model_doubleFalse.tflite"
-    interpreter, input_details, output_details = setup_model(tflite_save_path)
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    mp_hands = mp.solutions.hands
-    hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
-
-    while True:
-        data = await websocket.receive_bytes()
-        if data["type"] == "super_detected":
-            left, right = check_hand_position_api(data, hands, mp_hands, interpreter, input_details, output_details, use_double=False)
-            await websocket.send_json({"left": left, "right": right})
