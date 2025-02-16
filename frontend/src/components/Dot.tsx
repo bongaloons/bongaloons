@@ -3,7 +3,7 @@ import { GameContext } from '../context/GameContext';
 
 interface DotProps {
   targetTime: number;  // Time (ms) when the dot is meant to be hit
-  track: 'left' | 'right' | 'super';
+  track: string;
 }
 
 const Dot: FC<DotProps> = ({ targetTime, track }) => {
@@ -11,7 +11,8 @@ const Dot: FC<DotProps> = ({ targetTime, track }) => {
   const { gameState, ws } = useContext(GameContext);
   const [position, setPosition] = useState(dotStartPosition);
   const [isSprite] = useState(() => Math.random() < 0.4);
-  
+  console.log("DDDDDDDDDDDDDDDDDDDDDDDD", track);
+
   // Choose a color: for the "super" track, always rainbow; for left/right, pick from a set.
   const [color] = useState(() => {
     if (track === 'super') {

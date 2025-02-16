@@ -26,5 +26,12 @@
         "path":"/songmaps/payphone_rap.mid",
         "song":"/songs/payphone_rap.mp3",
         "bpm":112
+    },
+    {
+        "id": 4,
+        "name":"Supers (TEST)",
+        "path":"/songmaps/super.mid",
+        "song":"/songs/super.mp3",
+        "bpm":120
     }
 ]

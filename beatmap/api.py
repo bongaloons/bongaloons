@@ -145,6 +145,8 @@ async def start_game(id: int = 0):
         for move, notes in truth_moves.items()
         for note in notes
     ]
+
+    print(notes)
     
     return {
         "status": "started",
