@@ -28,6 +28,8 @@ export default function SongSelect() {
       });
   }, []);
 
+  console.log("Loading", loading);
+
   if (loading) {
     return (
       <div className="w-screen h-screen bg-gradient-to-b from-[#FFB07C] to-[#E88165] flex items-center justify-center">

@@ -222,6 +222,15 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
             currentStreak: data.currentStreak,
             maxStreak: data.maxStreak,
           }));
+        }  else if (data.type === "note_missed") {
+          // Process note missed events:
+          // For example, update lastJudgement to "MISS" and reset the current streak.
+          setGameState(prev => ({
+            ...prev,
+            lastJudgement: data.judgement,  // e.g. "MISS"
+            totalScore: data.totalScore,    // updated score if any penalty is applied
+            currentStreak: 0,               // reset streak on miss
+          }));
         } else if (data.type === "game_over") {
           setGameState(prev => ({
             ...prev,
@@ -318,7 +327,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   const playAgain = () => {
     setGameState(prev => ({
       ...prev,
-      totalScore: 0,
+      totalScore: null,
       currentStreak: 0,
       maxStreak: 0,
       scores: null,

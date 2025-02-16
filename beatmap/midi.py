@@ -243,6 +243,7 @@ with open("../frontend/public/settings.json", "r") as f:
     settings = json.load(f)
 
 DELAY_OFFSET = settings.get("delay", 0) / 1000
+REACTION_TIME = settings.get("reaction_time", 0) / 1000
 
 def score_live_note(
     move: str,
@@ -280,7 +281,7 @@ def score_live_note(
     
     if hit_note is not None:
         print(f"hit_note.start: {hit_note.start}, truth_note.start: {truth_note.start}, DELAY_OFFSET: {DELAY_OFFSET}")
-        diff = hit_note.start - (truth_note.start + DELAY_OFFSET)
+        diff = hit_note.start - (truth_note.start + DELAY_OFFSET + REACTION_TIME)
         if diff < -threshold:
             # Hit is too early.
             return Judgement.OOPS
@@ -325,13 +326,14 @@ def score_live_note(
         
         # Remove the truth note since it has been scored.
         global_truth_map[move].pop(0)
+        print(judgement)
         return judgement
     else:
         # No hit note provided. Check if it's already past the acceptable window.
         if current_time > truth_note.start + DELAY_OFFSET + threshold:
             # Time is up for this note.
             global_truth_map[move].pop(0)
-            print(truth_note.start, threshold)
+            print("past", truth_note.start, threshold)
             return Judgement.MISS
         else:
             return "waiting"
