@@ -12,5 +12,12 @@
         "path":"/songmaps/test.mid",
         "song":"/songs/test.mp3",
         "bpm":120
+    },
+    {
+        "id": 2,
+        "name":"Payphone (Maroon 5, Wiz Khalifa)",
+        "path":"/songmaps/payphone_rap.mid",
+        "song":"/songs/payphone_rap.mp3",
+        "bpm":112
     }
 ]

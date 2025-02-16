@@ -5,3 +5,8 @@ pygame
 fastapi==0.115.8
 uvicorn[standard]==0.34.0
 pydantic==2.10.2
+librosa
+mido
+python-rtmidi
+llvmlite==0.44.0
+numpy
