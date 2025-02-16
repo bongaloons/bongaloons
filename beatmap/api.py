@@ -10,6 +10,7 @@ from midi import (
     RANKING_THRESHOLDS,
     global_truth_map
 )
+import os
 
 app = FastAPI()
 
@@ -28,40 +29,52 @@ GAME_STATE = {
     "is_running": False,
     "start_time": None,
     "game_duration": 0,
-    "bpm": DEFAULT_BPM
+    "bpm": DEFAULT_BPM,
+    "songPath": "",   # Will hold the audio file path
+    "midiPath": "",   # Will hold the MIDI file path from the catalog
+    "songName": ""    # New: Name of the song from the catalog
 }
 
-def get_bpm_from_catalog(midi_file: str) -> int:
+def get_song_info_from_catalog(id: int) -> tuple:
     """
-    Reads catalog.json (in the same directory) and returns the BPM for the given midi_file.
-    If not found, returns DEFAULT_BPM.
+    Reads catalog.json (in the same directory) and returns a tuple (bpm, songPath, midiPath, songName)
+    for the given id. If not found, returns (DEFAULT_BPM, "", "", "").
     """
     try:
         with open("catalog.json", "r") as f:
             catalog = json.load(f)
         for entry in catalog:
-            # Assuming the JSON objects have a "path" key that we match against midi_file.
-            if entry.get("path") == midi_file:
-                return entry.get("bpm", DEFAULT_BPM)
+            if entry.get("id") == id:
+                bpm = entry.get("bpm", DEFAULT_BPM)
+                song = entry.get("song", "")
+                midi_path = entry.get("path", "")
+                song_name = entry.get("name", "")
+                return bpm, song, midi_path, song_name
     except Exception as e:
         print(f"Error reading catalog.json: {e}")
-    return DEFAULT_BPM
+    return DEFAULT_BPM, "", "", ""
 
 @app.post("/game/start")
-async def start_game(midi_file: str = "test.mid"):
+async def start_game(id: int = 0):
     """
     Initialize a new game session.
     Loads the truth beatmap from the MIDI file and loads each note one-by-one into the global truth map.
-    Reads the BPM from catalog.json.
+    Reads the BPM, song audio file path, MIDI path, and song name from catalog.json using the provided id.
     Computes the game duration (2 seconds after the last truth note).
     """
-    # Get BPM from catalog.json instead of estimating it.
-    bpm = get_bpm_from_catalog(midi_file)
+    # Get BPM, song path, MIDI path, and song name from catalog.json using id.
+    bpm, song_path, midi_path, song_name = get_song_info_from_catalog(id)
     GAME_STATE["bpm"] = bpm
-    print(f"Using BPM from catalog: {bpm}")
+    GAME_STATE["songPath"] = song_path
+    GAME_STATE["midiPath"] = midi_path
+    GAME_STATE["songName"] = song_name
+    print(f"Using BPM from catalog: {bpm}, Song path: {song_path}, MIDI path: {midi_path}, Song name: {song_name}")
 
-    # Parse the entire beatmap.
-    truth_moves = parse_midi(midi_file)
+    frontend_prefix = "../frontend/public"
+    # Parse the entire beatmap using the midiPath.
+    print(f"{frontend_prefix}{midi_path}")
+
+    truth_moves = parse_midi(f"{frontend_prefix}{midi_path}")
     
     # Clear any previous truth notes.
     global_truth_map.clear()
@@ -95,7 +108,10 @@ async def start_game(midi_file: str = "test.mid"):
     return {
         "status": "started",
         "duration": game_duration,
-        "falling_dots": falling_dots
+        "falling_dots": falling_dots,
+        "songPath": song_path,
+        "midiPath": midi_path,
+        "songName": song_name
     }
 
 @app.websocket("/game/ws")
@@ -127,14 +143,14 @@ async def game_websocket(websocket: WebSocket):
                 move = "left" if data["key"] == "a" else "right"
                 hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
                 # Score the hit using score_live_note.
-                judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1)
+                judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1/2)
                 
                 await websocket.send_json({
                     "type": "hit_registered",
                     "move": move,
                     "time": current_time,
                     "lastJudgement": judgement,
-                    "totalScore": 0  # TODO: add score
+                    "totalScore": 0  # TODO: add score calculation
                 })
             
             if current_time >= GAME_STATE["game_duration"]:

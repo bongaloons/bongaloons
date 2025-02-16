@@ -1,12 +1,16 @@
 [
     {
-        "name":"Jellyfish Song",
-        "path":"jellyfish.mid",
+        "id": 0,
+        "name":"Jellyfish Jam",
+        "path":"/songmaps/jellyfish.mid",
+        "song":"/songs/jellyfishjam.mp3",
         "bpm":125
     },
     {
+        "id": 999,
         "name":"Test",
         "path":"example.mid",
+        "song":"",
         "bpm":120
     }
 ]
