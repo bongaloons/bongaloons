@@ -2,8 +2,11 @@ import json
 import time
 import asyncio
 import os
+import mediapipe as mp
+
 from fastapi import FastAPI, WebSocket, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from detect_hand_position import check_hand_position_api, setup_model
 from midi import (
     parse_midi,
     load_truth_note,
@@ -365,3 +368,21 @@ async def upload_video_segment(
     except Exception as e:
         print(f"Error saving video: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.on_event("startup")
+async def startup_event(use_double=False):
+    global interpreter, input_details, output_details
+    tflite_save_path = "./model/model_doubleTrue.tflite" if use_double else "./model/model_doubleFalse.tflite"
+    interpreter, input_details, output_details = setup_model(tflite_save_path)
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    mp_hands = mp.solutions.hands
+    hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
+
+    while True:
+        data = await websocket.receive_bytes()
+        if data["type"] == "super_detected":
+            left, right = check_hand_position_api(data, hands, mp_hands, interpreter, input_details, output_details, use_double=False)
+            await websocket.send_json({"left": left, "right": right})

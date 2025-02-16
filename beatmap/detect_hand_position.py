@@ -4,10 +4,20 @@ import tensorflow as tf
 import numpy as np
 import time
 from config import *
+from fastapi import FastAPI, WebSocket
+import uvicorn
+
+app = FastAPI()
 
 # Define screen regions
 TOP_THRESHOLD = 0.33
 BOTTOM_THRESHOLD = 0.66
+
+# Initialize MediaPipe Hands and model interpreter globally
+mp_hands = mp.solutions.hands
+mp_drawing = mp.solutions.drawing_utils
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
+interpreter, input_details, output_details = None, None, None
 
 def detect_hand_position_draw(frame, hands, mp_hands, mp_drawing):
     #Unmirror the frame
@@ -162,19 +172,14 @@ def check_hand_position(octet_stream, hands, mp_hands, interpreter, input_detail
 
     return DOUBLE_ID_TO_GESTURE[most_common_left], 'none'
 
-def test_check_hand_position(bin_file, mp_hands, hands, interpreter, input_details, output_details, use_double):
+def check_hand_position_api(bin_file, mp_hands, hands, interpreter, input_details, output_details, use_double):
     with open(bin_file, "rb") as f:
         octet_stream = f.read()
     left, right = check_hand_position(octet_stream, hands, mp_hands, interpreter, input_details, output_details, use_double = use_double)
     return left, right
-    
-def main(use_double = False):
-    # Initialize MediaPipe Hands
-    print(SINGLE_LABEL_MAP, DOUBLE_LABEL_MAP)
-    mp_hands = mp.solutions.hands
-    mp_drawing = mp.solutions.drawing_utils
-    hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
 
+
+def main(use_double = False):
     # Open Webcam
     cap = cv2.VideoCapture(0)
     
@@ -182,7 +187,7 @@ def main(use_double = False):
     interpreter, input_details, output_details = setup_model(tflite_save_path)
     # Test hand position
     # test_hand_position_live(cap, hands, mp_hands, mp_drawing)
-    left, right = test_check_hand_position("test_double.bin", mp_hands, hands, interpreter, input_details, output_details, use_double = use_double)
+    left, right = check_hand_position_api("test_double.bin", mp_hands, hands, interpreter, input_details, output_details, use_double = use_double)
     print(left, right)
     cap.release()
     cv2.destroyAllWindows()
@@ -192,4 +197,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="run gesture recognizer")
     parser.add_argument('--use_double', action='store_true', help="detect hand gestures that involve both hands")
     args = parser.parse_args()
-    main(use_double=args.use_double)
+    use_double = args.use_double
+    uvicorn.run(app, host="0.0.0.0", port=8000)
