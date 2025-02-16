@@ -72,7 +72,8 @@ const Dot: FC<DotProps> = ({ delay, targetTime, fallDuration }) => {
           : {
               background: `radial-gradient(circle at 30% 30%, ${visual}ee, ${visual}aa, ${visual}88)`,
               boxShadow: `0 0 10px ${visual}66`,
-              transition: 'bottom 0.05s linear'
+              transition: 'bottom 0.05s linear',
+              border: '4px solid rgba(0, 0, 0, 0.8)',
             }
         )
       }}
