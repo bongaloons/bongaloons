@@ -1,3 +1,10 @@
+const JUDGEMENT_CAT_GIFS: Record<string, string[]> = {
+  'PERFECT': ['/gallery/cat-jump.gif', '/gallery/cat-toast.gif', '/gallery/cat-yelled.gif'],
+  'GOOD': ['/gallery/cat-jump.gif', '/gallery/cat-toast.gif'],
+  'BAD': ['/gallery/cat-yelled.gif', '/gallery/sideeye-cat.gif'],
+  'MISS': ['/gallery/angry-cat.gif', '/gallery/sad-thumbsup.gif']
+};
+
 export function judgementToString(judgement: string): string {
   if (judgement.startsWith("perfect")) return "PERFECT";
   if (judgement.startsWith("good")) return "GOOD";
@@ -26,8 +33,16 @@ export default function BigJudgement({ judgement }: { judgement: string }) {
             zIndex: 10
           }}
         >
+          <div 
+            key={`${judgement}-${Date.now()}`}
+            className="animate-slide-across"
+          >
+            <img src={
+              JUDGEMENT_CAT_GIFS[judgement]?.[Math.floor(Math.random() * (JUDGEMENT_CAT_GIFS[judgement]?.length || 1))] || '/cats/default.gif'
+            } className="w-[300px] h-[300px] opacity-50" />
+          </div>
           <pre 
-            className="text-[300px] font-broken"
+            className="text-[300px]"
             style={{
               transform: "rotate(13deg)",
               whiteSpace: "nowrap",

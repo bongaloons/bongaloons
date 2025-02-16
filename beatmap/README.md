@@ -18,3 +18,12 @@ uvicorn api:app --reload
 ```
 
 
+## FInd port
+```bash
+ioreg -p IOUSB
+```
+
+```bash
+ls /dev/S.usbmodem101 
+```
+

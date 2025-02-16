@@ -266,7 +266,8 @@ def score_live_note(
     """
     # If no truth notes remain for the move, we can't score
     if move not in global_truth_map or not global_truth_map[move]:
-        return "No scheduled note"
+        # return "No scheduled note"
+        return Judgement.OOPS
     
     truth_note = global_truth_map[move][0]  # Get the earliest unsolved truth note.
     quarter_duration = 60.0 / bpm
@@ -325,6 +326,7 @@ def score_live_note(
         if current_time > truth_note.start + threshold:
             # Time is up for this note.
             global_truth_map[move].pop(0)
+            print(truth_note.start)
             return Judgement.MISS
         else:
             return "waiting"
