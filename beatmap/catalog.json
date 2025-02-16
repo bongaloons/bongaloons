@@ -7,10 +7,10 @@
         "bpm":125
     },
     {
-        "id": 999,
-        "name":"Test",
-        "path":"example.mid",
-        "song":"",
+        "id": 1,
+        "name":"Goofy Silly Test Song",
+        "path":"/songmaps/test.mid",
+        "song":"/songs/test.mp3",
         "bpm":120
     }
 ]

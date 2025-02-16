@@ -10,11 +10,11 @@ from midi import (
     global_truth_map
 )
 from models import (
-    GameStartInput,
-    GameStartResponse,
     GameStatusResponse,
+    GetSongsResponse,
     HealthCheckResponse,
-    FallingDot
+    FallingDot,
+    Song
 )
 from score import calculate_score
 
@@ -44,6 +44,7 @@ GAME_STATE = {
     "max_streak": 0
 }
 
+
 def get_song_info_from_catalog(id: int) -> tuple:
     """
     Reads catalog.json (in the same directory) and returns a tuple (bpm, songPath, midiPath, songName)
@@ -62,6 +63,21 @@ def get_song_info_from_catalog(id: int) -> tuple:
     except Exception as e:
         print(f"Error reading catalog.json: {e}")
     return DEFAULT_BPM, "", "", ""
+
+
+@app.get("/songs")
+async def get_songs() -> GetSongsResponse:
+    """
+    Reads catalog.json (in the same directory) and returns a list of Song objects.
+    """
+    try:
+        with open("catalog.json", "r") as f:
+            catalog = json.load(f)
+        return GetSongsResponse(songs=[Song(**entry) for entry in catalog])
+    except Exception as e:
+        print(f"Error reading catalog.json: {e}")
+        return GetSongsResponse(songs=[])
+
 
 @app.post("/game/start")
 async def start_game(id: int = 0):

@@ -2,6 +2,16 @@ from pydantic import BaseModel
 from typing import List, Optional, Literal
 
 
+class Song(BaseModel):
+    id: int
+    name: str
+    path: str
+    song: str
+    bpm: int
+
+class GetSongsResponse(BaseModel):
+    songs: List[Song]
+
 class GameStartInput(BaseModel):
     midi_file: str = "test.mid"
 

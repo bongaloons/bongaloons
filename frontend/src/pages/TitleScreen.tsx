@@ -6,7 +6,7 @@ import { GameContext } from "../context/GameContext";
 export default function TitleScreen() {
     const [pose, setPose] = useState<Pose>('idle');
     const [keysPressed, setKeysPressed] = useState<Set<string>>(new Set());
-    const { startGame } = useContext(GameContext);
+    const { setShowSongSelect } = useContext(GameContext);
 
     useEffect(() => {
         const handleKeyPress = (event: KeyboardEvent) => {
@@ -16,6 +16,7 @@ export default function TitleScreen() {
                 return newKeys;
             });
         };
+        
 
         const handleKeyUp = (event: KeyboardEvent) => {
             setKeysPressed(prev => {
@@ -66,7 +67,7 @@ export default function TitleScreen() {
             <div className="flex flex-col gap-4 z-20 w-full items-center justify-center">
                 <button 
                     className="w-64 bg-white hover:bg-gray-100 text-black font-semibold py-3 px-6 rounded-lg shadow-md transition-colors duration-200 text-2xl"
-                    onClick={() => startGame()}
+                    onClick={() => setShowSongSelect(true)}
                 >
                     Start Game
                 </button>

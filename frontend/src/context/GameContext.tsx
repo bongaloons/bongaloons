@@ -34,9 +34,12 @@ interface GameContextType {
   isStarted: boolean;
   gameState: GameState;
   ws: WebSocket | null;
-  startGame: () => Promise<void>;
+  startGame: (songId?: number) => Promise<void>;
   updatePose: (pose: Pose) => void;
   endGame: () => void;
+  showSongSelect: boolean;
+  setShowSongSelect: (show: boolean) => void;
+  playAgain: () => void;
 }
 
 export const GameContext = createContext<GameContextType>({
@@ -60,11 +63,15 @@ export const GameContext = createContext<GameContextType>({
   startGame: async () => {},
   updatePose: () => {},
   endGame: () => {},
+  showSongSelect: false,
+  setShowSongSelect: () => {},
+  playAgain: () => {},
 });
 
 export const GameProvider = ({ children }: { children: ReactNode }) => {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [isStarted, setIsStarted] = useState(false);
+  const [showSongSelect, setShowSongSelect] = useState(false);
   const [gameState, setGameState] = useState<GameState>({
     isRunning: false,
     songPath: "",
@@ -85,7 +92,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     setGameState(prev => ({ ...prev, currentPose: pose }));
   };
 
-  const startGame = async () => {
+  const startGame = async (songId: number = 0) => {
     setIsStarted(true);
     try {
       // First check if backend is alive
@@ -107,14 +114,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         
         try {
           console.log('Starting game...');
-          const response = await fetch('http://127.0.0.1:8000/game/start?id=0', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              midi_file: 'jellyfish.mid'
-            })
+          const response = await fetch(`http://127.0.0.1:8000/game/start?id=${songId}`, {
+            method: 'POST'
           });
           
           if (!response.ok) {
@@ -258,8 +259,31 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     setIsStarted(false);
   };
 
+  const playAgain = () => {
+    setGameState(prev => ({
+      ...prev,
+      totalScore: null,
+      currentStreak: null,
+      maxStreak: null,
+      scores: null,
+      isRunning: false,
+      fallingDots: [],
+    }));
+    setShowSongSelect(true);
+  };
+
   return (
-    <GameContext.Provider value={{ isStarted, gameState, ws, startGame, updatePose, endGame }}>
+    <GameContext.Provider value={{ 
+      isStarted, 
+      gameState, 
+      ws, 
+      startGame, 
+      updatePose, 
+      endGame,
+      showSongSelect,
+      setShowSongSelect,
+      playAgain
+    }}>
       {children}
     </GameContext.Provider>
   );
