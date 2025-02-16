@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import { Pose } from '../types';
+import { clearAudio, playSoundFile } from '../utils/audioPlayer';
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -262,6 +263,10 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updatePoseBasedOnKeys = (pressedKeys: Set<string>) => {
+    if (pressedKeys.has('a') || pressedKeys.has('l')) {
+      playSoundFile('/sfx/hit.ogg');
+    }
+
     if (pressedKeys.has('a') && pressedKeys.has('l')) {
       updatePose('both');
     } else if (pressedKeys.has('a')) {
@@ -334,6 +339,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       isRunning: false,
       fallingDots: [],
     }));
+    clearAudio();
     setShowSongSelect(true);
   };
 

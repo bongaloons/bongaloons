@@ -5,6 +5,7 @@ import { GameContext } from "../context/GameContext";
 import PushButton from "../components/PushButton";
 import DvdLogo from "../components/cosmetics/DvdLogo";
 import Leaderboard from "../components/Leaderboard";
+import { clearAudio, playSoundFile } from '../utils/audioPlayer';
 
 const GIFS = [
     'gallery/cat-jump.gif',
@@ -14,17 +15,38 @@ const GIFS = [
     'gallery/cat-toast.gif',
     'gallery/dance-cat.gif',
     'gallery/sideeye-cat.gif',
-    
-]
+];
 
 export default function TitleScreen() {
     const [pose, setPose] = useState<Pose>('idle');
     const [keysPressed, setKeysPressed] = useState<Set<string>>(new Set());
-    const [cats, setCats] = useState<Array<{x: number, y: number, size: number}>>([]);
+    const [cats, setCats] = useState<Array<{ x: number, y: number, size: number }>>([]);
     const { setShowSongSelect } = useContext(GameContext);
     const PADDING = 50; // pixels from the edge where cats can't spawn
     const [currentGif, setCurrentGif] = useState<string>(GIFS[0]);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
+    const [audioUnlocked, setAudioUnlocked] = useState(false);
+
+    // Unlock audio playback on the first user interaction.
+    useEffect(() => {
+      const unlockAudio = () => {
+        if (!audioUnlocked) {
+          clearAudio()
+          playSoundFile('/sfx/title.ogg')
+            .then(() => {
+              setAudioUnlocked(true);
+            })
+            .catch((err) => {
+              console.error("Error playing sound on user interaction:", err);
+            });
+        }
+      };
+      // Use the { once: true } option so this listener auto-removes itself.
+      window.addEventListener('click', unlockAudio, { once: true });
+      return () => {
+        window.removeEventListener('click', unlockAudio);
+      };
+    }, [audioUnlocked]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -37,17 +59,15 @@ export default function TitleScreen() {
 
     const spawnCat = (clientX: number, clientY: number) => {
         if (
-            clientX < PADDING || 
+            clientX < PADDING ||
             clientX > window.innerWidth - PADDING ||
-            clientY < PADDING || 
+            clientY < PADDING ||
             clientY > window.innerHeight - PADDING
         ) {
             return;
         }
-
         const x = (clientX / window.innerWidth) * 100;
         const y = (clientY / window.innerHeight) * 100;
-        
         setCats(prevCats => [...prevCats, {
             x: 100 - x,
             y,
@@ -63,8 +83,6 @@ export default function TitleScreen() {
                 return newKeys;
             });
         };
-        
-
         const handleKeyUp = (event: KeyboardEvent) => {
             setKeysPressed(prev => {
                 const newKeys = new Set(prev);
@@ -72,10 +90,8 @@ export default function TitleScreen() {
                 return newKeys;
             });
         };
-
         window.addEventListener('keydown', handleKeyPress);
         window.addEventListener('keyup', handleKeyUp);
-
         return () => {
             window.removeEventListener('keydown', handleKeyPress);
             window.removeEventListener('keyup', handleKeyUp);
@@ -99,7 +115,6 @@ export default function TitleScreen() {
         const newCats = Array.from({ length: initialNumberOfCats }, () => {
             const safeX = Math.random() * (window.innerWidth - 2 * PADDING) + PADDING;
             const safeY = Math.random() * (window.innerHeight - 2 * PADDING) + PADDING;
-            
             return {
                 x: (100 * safeX / window.innerWidth),
                 y: (100 * safeY / window.innerHeight),
@@ -111,14 +126,13 @@ export default function TitleScreen() {
 
     // Periodic spawning of new cats
     useEffect(() => {
-        console.log("Setting up periodic spawn interval"); // Debug log
+        console.log("Setting up periodic spawn interval");
         const spawnInterval = setInterval(() => {
-            console.log("Checking for spawn"); // Debug log
+            console.log("Checking for spawn");
             if (Math.random() < 0.3) {
-                console.log("Spawning new cat"); // Debug log
+                console.log("Spawning new cat");
                 const safeX = Math.random() * (window.innerWidth - 2 * PADDING) + PADDING;
                 const safeY = Math.random() * (window.innerHeight - 2 * PADDING) + PADDING;
-                
                 setCats(prevCats => [...prevCats, {
                     x: (100 * safeX / window.innerWidth),
                     y: (100 * safeY / window.innerHeight),
@@ -126,9 +140,8 @@ export default function TitleScreen() {
                 }]);
             }
         }, 2000);
-
         return () => {
-            console.log("Cleaning up interval"); // Debug log
+            console.log("Cleaning up interval");
             clearInterval(spawnInterval);
         };
     }, [PADDING]);
@@ -141,7 +154,6 @@ export default function TitleScreen() {
                     const randomPose: Pose = ['left', 'right', 'both'][Math.floor(Math.random() * 3)] as Pose;
                     setPose(randomPose);
                     slapCount++;
-                    
                     if (slapCount > 10) {
                         clearInterval(rapidSlaps);
                         setPose('idle');
@@ -150,10 +162,9 @@ export default function TitleScreen() {
                 setPose('idle');
             }
         }, 1500);
-
         return () => {
             setPose('idle');
-            clearInterval(slapInterval)
+            clearInterval(slapInterval);
         };
     }, []);
 
@@ -179,7 +190,7 @@ export default function TitleScreen() {
                                 className="z-20"
                                 onClick={() => setShowSongSelect(true)}
                             >
-                                    Start Game
+                                Start Game
                             </PushButton>
                             <PushButton className="z-20">
                                 Settings
@@ -213,10 +224,9 @@ export default function TitleScreen() {
                         <Leaderboard onClose={() => setShowLeaderboard(false)} />
                     </div>
                 ) : (
-                    <img src={currentGif} className="w-full" />
+                    <img src={currentGif} className="w-full" alt="Animated Content" />
                 )}
             </div>
-
         </div>
-    )
+    );
 }

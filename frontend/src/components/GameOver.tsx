@@ -1,7 +1,8 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { GameContext } from '../context/GameContext';
 import PushButton from './PushButton';
-import PushInput from './PushInput';
+import { playSoundFile } from '../utils/audioPlayer';
+
 // Rank thresholds and comments
 const RANK_THRESHOLDS = {
   SSS: { score: 100000, streak: 50, comment: "Are you even human? That was incredible!" },
@@ -15,7 +16,7 @@ const RANK_THRESHOLDS = {
   F: { score: 0, streak: 0, comment: "Maybe stick to petting cats instead?" }
 };
 
-function calculateRank(score: number, maxStreak: number): {rank: string, comment: string} {
+function calculateRank(score: number, maxStreak: number): { rank: string, comment: string } {
   for (const [rank, criteria] of Object.entries(RANK_THRESHOLDS)) {
     if (score >= criteria.score && maxStreak >= criteria.streak) {
       return { rank, comment: criteria.comment };
@@ -30,9 +31,14 @@ export default function GameOver() {
   const [submitted, setSubmitted] = useState(false);
   const { rank, comment } = calculateRank(gameState.totalScore || 0, gameState.maxStreak || 0);
 
+  // Play the results audio on component mount
+  useEffect(() => {
+    playSoundFile('/sfx/results.mp3', 0.2)
+  }, []);
+
   const handleSubmitScore = async () => {
     if (!playerName.trim()) return;
-    
+
     try {
       const params = new URLSearchParams({
         name: playerName,
@@ -72,11 +78,12 @@ export default function GameOver() {
         </div>
         {!submitted ? (
           <div className="mb-6">
-            <PushInput
+            <input
+              type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="Enter your name"
-              className="px-4 py-2 border rounded-lg mr-4 font-display"
+              className="px-4 py-2 border rounded-lg mb-4 font-display"
               maxLength={20}
             />
             <PushButton onClick={handleSubmitScore} color="black">
@@ -91,4 +98,4 @@ export default function GameOver() {
       </div>
     </div>
   );
-} 
+}
