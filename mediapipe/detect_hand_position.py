@@ -160,13 +160,13 @@ def check_hand_position(octet_stream, hands, mp_hands, interpreter, input_detail
         most_common_right = gesture_counts_right.index(max(gesture_counts_right))
         return SINGLE_ID_TO_GESTURE[most_common_left], SINGLE_ID_TO_GESTURE[most_common_right]
 
-    return DOUBLE_ID_TO_GESTURE[most_common_left]
+    return DOUBLE_ID_TO_GESTURE[most_common_left], 'none'
 
 def test_check_hand_position(bin_file, mp_hands, hands, interpreter, input_details, output_details, use_double):
     with open(bin_file, "rb") as f:
         octet_stream = f.read()
-    region = check_hand_position(octet_stream, hands, mp_hands, interpreter, input_details, output_details, use_double = use_double)
-    print(region)
+    left, right = check_hand_position(octet_stream, hands, mp_hands, interpreter, input_details, output_details, use_double = use_double)
+    return left, right
     
 def main(use_double = False):
     # Initialize MediaPipe Hands
@@ -178,12 +178,12 @@ def main(use_double = False):
     # Open Webcam
     cap = cv2.VideoCapture(0)
     
-    tflite_save_path = "../model/model_doubleTrue.tflite" if use_double else "../model/model_doubleFalse.tflite"
+    tflite_save_path = "./model/model_doubleTrue.tflite" if use_double else "./model/model_doubleFalse.tflite"
     interpreter, input_details, output_details = setup_model(tflite_save_path)
     # Test hand position
     # test_hand_position_live(cap, hands, mp_hands, mp_drawing)
-    test_check_hand_position("test_double.bin", mp_hands, hands, interpreter, input_details, output_details, use_double = use_double)
-
+    left, right = test_check_hand_position("test_double.bin", mp_hands, hands, interpreter, input_details, output_details, use_double = use_double)
+    print(left, right)
     cap.release()
     cv2.destroyAllWindows()
 
