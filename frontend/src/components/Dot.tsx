@@ -3,7 +3,7 @@ import { GameContext } from '../context/GameContext';
 
 interface DotProps {
   targetTime: number;  // Time (ms) when the dot is meant to be hit
-  track: 'left' | 'right' | 'super';
+  track: string;
 }
 
 const Dot: FC<DotProps> = ({ targetTime, track }) => {

@@ -149,6 +149,8 @@ async def start_game(id: int = 0):
         for move, notes in truth_moves.items()
         for note in notes
     ]
+
+    print(notes)
     
     return {
         "status": "started",
@@ -226,7 +228,7 @@ async def game_status_checker(websocket: WebSocket):
         for move in list(global_truth_map.keys()):
             # print(list(global_truth_map.keys()))
             while global_truth_map.get(move):
-                print("a")
+                # print("a")
                 judgement = score_live_note(
                     move,
                     current_time - T_FALL,
