@@ -160,6 +160,7 @@ async def start_game(id: int = 0):
         "bpm": GAME_STATE["bpm"]  # Added bpm field
     }
 
+
 async def process_hit(websocket: WebSocket, move: str, current_time: float):
     """Helper function to process a hit (from keyboard or serial)"""
     hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
@@ -225,7 +226,7 @@ async def game_status_checker(websocket: WebSocket):
         for move in list(global_truth_map.keys()):
             # print(list(global_truth_map.keys()))
             while global_truth_map.get(move):
-                # print("a")
+                print("a")
                 judgement = score_live_note(
                     move,
                     current_time - T_FALL,
@@ -253,7 +254,6 @@ async def game_status_checker(websocket: WebSocket):
                 # print("c")
             # print("D")
         await asyncio.sleep(0.02)
-    print("difhdifh")
 
 
 @app.websocket("/game/ws")
@@ -268,14 +268,30 @@ async def game_websocket(websocket: WebSocket):
     try:
         while True:
             serial_key = serial_handler.get_key()
-            if serial_key in ["a", "l"]:
-                move = "left" if serial_key == "a" else "right"
-                if GAME_STATE["is_running"]:
+            if serial_key:
+                move = None
+                if serial_key == "both":
+                    move = "both"
+                elif serial_key == "a":
+                    move = "left"
+                elif serial_key == "l":
+                    move = "right"
+                
+                if move and GAME_STATE["is_running"]:
                     current_time = time.perf_counter() - GAME_STATE["start_time"]
                     # TODO: remove following line, this is to just temp patch the serial input which seems delayed
                     current_time -= 0.05
-                    print(f"Processing serial hit: {move} at time {current_time}")  # Debug print
-                    await process_hit(websocket, move, current_time)
+                    
+                    await websocket.send_json({
+                        "move": move,
+                        "type": "pose_update"
+                    })
+                    
+                    if move == "both":
+                        await process_hit(websocket, "left", current_time)
+                        await process_hit(websocket, "right", current_time)
+                    else:
+                        await process_hit(websocket, move, current_time)
             
             try:
                 data = await asyncio.wait_for(websocket.receive_json(), timeout=0.01)
@@ -315,7 +331,6 @@ async def game_websocket(websocket: WebSocket):
                 move = "left" if data["key"] == "a" else "right"
                 await process_hit(websocket, move, current_time)
             
-            # print("hello", current_time, GAME_STATE["game_duration"] + T_END)
 
             if current_time >= GAME_STATE["game_duration"] + T_END:
                 await handle_game_over(websocket, current_time)

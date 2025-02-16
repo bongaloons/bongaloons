@@ -227,6 +227,15 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
       newWs.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        if (data.move && data.type === "pose_update") {
+          updatePose(data.move);
+          setTimeout(() => {
+            setGameState(prev => ({
+              ...prev,
+              currentPose: "idle",
+            }));
+          }, 100);
+        }
         if (data.type === "hit_registered") {
           setGameState(prev => ({
             ...prev,
