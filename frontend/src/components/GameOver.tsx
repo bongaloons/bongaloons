@@ -1,6 +1,8 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { GameContext } from '../context/GameContext';
 import PushButton from './PushButton';
+import { playSoundFile } from '../utils/audioPlayer';
+
 // Rank thresholds and comments
 const RANK_THRESHOLDS = {
   SSS: { score: 100000, streak: 50, comment: "Are you even human? That was incredible!" },
@@ -14,7 +16,7 @@ const RANK_THRESHOLDS = {
   F: { score: 0, streak: 0, comment: "Maybe stick to petting cats instead?" }
 };
 
-function calculateRank(score: number, maxStreak: number): {rank: string, comment: string} {
+function calculateRank(score: number, maxStreak: number): { rank: string, comment: string } {
   for (const [rank, criteria] of Object.entries(RANK_THRESHOLDS)) {
     if (score >= criteria.score && maxStreak >= criteria.streak) {
       return { rank, comment: criteria.comment };
@@ -29,9 +31,14 @@ export default function GameOver() {
   const [submitted, setSubmitted] = useState(false);
   const { rank, comment } = calculateRank(gameState.totalScore || 0, gameState.maxStreak || 0);
 
+  // Play the results audio on component mount
+  useEffect(() => {
+    playSoundFile('/sfx/results.mp3', 0.8)
+  }, []);
+
   const handleSubmitScore = async () => {
     if (!playerName.trim()) return;
-    
+
     try {
       const params = new URLSearchParams({
         name: playerName,
@@ -91,4 +98,4 @@ export default function GameOver() {
       </div>
     </div>
   );
-} 
+}

@@ -7,7 +7,7 @@ import Table from '../components/cosmetics/Table';
 import BongoCat from '../components/BongoCat';
 import { StreakDisplay } from '../components/StreakDisplay';
 import BigJudgement from '../components/BigJudgement';
-import { playSoundFile } from '../utils/audioPlayer';
+import { playSoundFile, clearAudio } from '../utils/audioPlayer';
 
 function Game() {
   const { isStarted, gameState, ws, startGame, updatePose, togglePause, endGame } = useContext(GameContext)
@@ -18,6 +18,13 @@ function Game() {
   const [audioReady, setAudioReady] = useState(true)
   // A ref to store the time when the resume was triggered.
   const resumeTriggerTimeRef = useRef<number | null>(null)
+
+  // When the game starts, clear any audio (like the title screen music)
+  useEffect(() => {
+    if (gameState.isRunning) {
+      clearAudio(); // Clear title screen audio once when the game starts.
+    }
+  }, [gameState.isRunning]);
 
   useEffect(() => {
     if (gameState.isRunning) {
@@ -98,8 +105,6 @@ function Game() {
   
 
   // Now you can use the "audioReady" flag in your note/update logic.
-  // For example, your note animation can check that audioReady is true before moving:
-  // if (!audioReady) return; // wait until the audio has resumed
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-[#E9967A] overflow-hidden">
@@ -157,7 +162,7 @@ function Game() {
       {/* Score & Streak display */}
       <div className="absolute flex flex-col gap-2 top-4 left-4 z-20">
         <div className="flex flex-row gap-2 px-4 py-2 bg-white rounded-lg shadow-lg justify-between items-center">
-        <button
+          <button
             onClick={() => {
               togglePause()
               if (ws) {
