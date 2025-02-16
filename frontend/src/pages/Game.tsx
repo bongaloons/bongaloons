@@ -2,12 +2,13 @@ import '../App.css'
 import Track from '../components/Track'
 import { useContext, useEffect, useRef } from 'react'
 import { GameContext } from '../context/GameContext'
-import Judegment from '../components/Judegment';
+import Judegment from '../components/Judgement';
 import Table from '../components/cosmetics/Table';
 import BongoCat from '../components/BongoCat';
+import { StreakDisplay } from '../components/StreakDisplay';
 
 function Game() {
-  const { gameState, startGame } = useContext(GameContext)
+  const { gameState, endGame } = useContext(GameContext)
   // Create a ref for the audio element.
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
@@ -45,14 +46,20 @@ function Game() {
         WS: {gameState.connectionStatus}
       </div>
 
-      <div className="absolute flex flex-col gap-2 top-4 left-4 px-4 py-2 bg-white rounded-lg shadow-lg z-20">
-        <button
-          onClick={startGame}
-          className="py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 z-20 font-display text-xl"
-        >
-          Start Game
-        </button>
-        <div className="font-display text-xl">Total Score: {gameState.totalScore}</div>
+      <div className="absolute flex flex-col gap-2 top-4 left-4 z-20">
+        <div className="flex flex-row gap-2 px-4 py-2 bg-white rounded-lg shadow-lg justify-between items-center">
+            <button
+              onClick={endGame}
+              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 z-20 font-display text-xl inline-flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+              </svg>
+              Pause
+            </button>
+            <div className="font-display text-xl">Total Score: {gameState.totalScore}</div>
+        </div>
+        <StreakDisplay />
       </div>
 
       {gameState.lastJudgement && (

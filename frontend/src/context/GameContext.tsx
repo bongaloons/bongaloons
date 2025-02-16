@@ -17,6 +17,8 @@ interface GameState {
   connectionStatus: ConnectionStatus;
   lastJudgement: string | null;
   totalScore: number | null;
+  currentStreak: number | null;
+  maxStreak: number | null;
   scores: {
     [key: string]: Array<{
       truth_time: number | null;
@@ -50,6 +52,8 @@ export const GameContext = createContext<GameContextType>({
     scores: null,
     lastJudgement: null,
     totalScore: null,
+    currentStreak: null,
+    maxStreak: null,
     pressedKeys: new Set<string>(),
   },
   ws: null,
@@ -72,6 +76,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     scores: null,
     lastJudgement: null,
     totalScore: null,
+    currentStreak: null,
+    maxStreak: null,
     pressedKeys: new Set<string>(),
   });
 
@@ -103,6 +109,12 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           console.log('Starting game...');
           const response = await fetch('http://127.0.0.1:8000/game/start?id=0', {
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              midi_file: 'jellyfish.mid'
+            })
           });
           
           if (!response.ok) {
@@ -147,20 +159,24 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       newWs.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.type === "hit_registered") {
-          setGameState(prev => ({
-            ...prev,
-            lastJudgement: data.lastJudgement,
-            totalScore: data.totalScore,
-          }));
+            setGameState(prev => ({
+                ...prev,
+                lastJudgement: data.lastJudgement,
+                totalScore: data.totalScore,
+                currentStreak: data.currentStreak,
+                maxStreak: data.maxStreak,
+            }));
         } else if (data.type === "game_over") {
-          setGameState(prev => ({
-            ...prev,
-            scores: data.scores,
-            lastJudgement: data.lastJudgement,
-            totalScore: data.totalScore,
-            isRunning: false
-          }));
-          setIsStarted(false);
+            setGameState(prev => ({
+                ...prev,
+                scores: data.scores,
+                lastJudgement: data.lastJudgement,
+                totalScore: data.totalScore,
+                currentStreak: 0,
+                maxStreak: data.maxStreak,
+                isRunning: false
+            }));
+            setIsStarted(false);
         }
         console.log('Game state updated:', data);
       };
