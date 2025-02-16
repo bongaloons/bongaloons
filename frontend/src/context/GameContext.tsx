@@ -35,6 +35,7 @@ interface GameState {
   pressedKeys: Set<string>;
   fallDuration: number;
   delay: number;
+  reactionTime: number;
 }
 
 interface GameContextType {
@@ -52,6 +53,7 @@ interface GameContextType {
 
 const DEFAULT_FALL_DURATION = 2000;
 const DEFAULT_DELAY = 2000;
+const DEFAULT_REACTION_TIME = 250;
 
 export const GameContext = createContext<GameContextType>({
   isStarted: false,
@@ -75,6 +77,7 @@ export const GameContext = createContext<GameContextType>({
     pressedKeys: new Set<string>(),
     fallDuration: DEFAULT_FALL_DURATION,
     delay: DEFAULT_DELAY,
+    reactionTime: DEFAULT_REACTION_TIME,
   },
   ws: null,
   startGame: async () => {},
@@ -110,6 +113,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     pressedKeys: new Set<string>(),
     fallDuration: DEFAULT_FALL_DURATION,
     delay: DEFAULT_DELAY,
+    reactionTime: DEFAULT_REACTION_TIME,
   });
 
   const updatePose = (pose: Pose) => {
@@ -142,7 +146,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         setGameState(prev => ({
           ...prev,
           fallDuration: data.fall_duration,
-          delay: data.delay
+          delay: data.delay,
+          reactionTime: data.reaction_time
         }));
       })
       .catch(err => console.error("Error fetching settings.json:", err));

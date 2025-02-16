@@ -1,20 +1,27 @@
 [
     {
         "id": 0,
-        "name":"Jellyfish Jam",
+        "name":"The Cha Cha Slide (Easy)",
+        "path":"songmaps/chacha.mid",
+        "song":"songs/chacha.mp3",
+        "bpm":122
+    },
+    {
+        "id": 1,
+        "name":"Jellyfish Jam (Hard)",
         "path":"songmaps/jellyfish.mid",
         "song":"songs/jellyfishjam.mp3",
         "bpm":125
     },
     {
-        "id": 1,
+        "id": 2,
         "name":"Goofy Silly Test Song",
         "path":"songmaps/test.mid",
         "song":"songs/test.mp3",
         "bpm":120
     },
     {
-        "id": 2,
+        "id": 3,
         "name":"Payphone (Maroon 5, Wiz Khalifa)",
         "path":"/songmaps/payphone_rap.mid",
         "song":"/songs/payphone_rap.mp3",
