@@ -102,21 +102,28 @@ def evaluate_gesture_recognizer(model, x_test, y_test):
     loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
     return loss, accuracy
 
+def export_model(model, tflite_save_path):
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    tflite_quantized_model = converter.convert()
+
+    open(tflite_save_path, 'wb').write(tflite_quantized_model)
+
 def main(use_double=False):
     # Set paths
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
     print(tf.config.list_physical_devices('GPU'))
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
     
-    dataset_path = "hand_keypoints_doubleFalse.csv" if use_double else "hand_keypoints_doubleTrue.csv"
-    model_dir = "../model/model.keras"
-        
+    dataset_path = "../data/hand_keypoints_doubleTrue.csv" if use_double else "../data/hand_keypoints_doubleFalse.csv"
+    model_dir = "../model/model_doubleTrue.keras" if use_double else "../model/model_doubleFalse.keras"
+    print(dataset_path)
     # Load and preprocess data
     x_train, x_test, y_train, y_test = load_data(dataset_path, double=use_double)
     
     # Model parameters
-    input_size = 63  
-    hidden_size = 128
+    input_size = 126 if use_double else 63
+    hidden_size = 64
     output_size = len(SINGLE_GESTURES)  # Number of gesture classes
     num_layers = 3
     dropout_rate = 0.1
@@ -144,6 +151,8 @@ def main(use_double=False):
     loss, accuracy = evaluate_gesture_recognizer(model, x_test, y_test)
     print(f"\nFinal Test Loss: {loss:.4f}")
     print(f"Final Test Accuracy: {accuracy:.4f}")
+
+    export_model(model, model_dir.replace(".keras", ".tflite"))
 
 if __name__ == "__main__":
     import argparse
