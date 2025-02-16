@@ -18,6 +18,7 @@ function Game() {
   const [audioReady, setAudioReady] = useState(true)
   // A ref to store the time when the resume was triggered.
   const resumeTriggerTimeRef = useRef<number | null>(null)
+  const startTimeRef = useRef<number | null>(null);
 
   // When the game starts, clear any audio (like the title screen music)
   useEffect(() => {
@@ -121,23 +122,43 @@ function Game() {
       async function startContinuousRecording() {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "user" },
+            video: { 
+              facingMode: "user",
+              frameRate: { ideal: 30 }  // Set frame rate to 30fps
+            },
             audio: false,
           });
 
           videoStreamRef.current = stream;
           recordedChunksRef.current = [];
 
-          const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+          const recorder = new MediaRecorder(stream, { 
+            mimeType: "video/webm",
+            videoBitsPerSecond: 1500000
+          });
           mediaRecorderRef.current = recorder;
 
           recorder.ondataavailable = (event) => {
+            console.log("Data available event:", event.data.size);
             if (event.data.size > 0) {
-              recordedChunksRef.current.push(event.data); // Store chunks continuously
+                recordedChunksRef.current.push(event.data);
+                console.log("Current chunks:", recordedChunksRef.current.length);
             }
           };
 
-          recorder.start(100); // Save small chunks every 100ms
+          recorder.onerror = (event) => {
+            console.error("MediaRecorder error:", event);
+          };
+
+          recorder.onstart = () => {
+            console.log("MediaRecorder started");
+          };
+
+          recorder.onstop = () => {
+            console.log("MediaRecorder stopped");
+          };
+
+          recorder.start(100); // Save chunks every 100ms
           setIsRecording(true);
         } catch (error) {
           console.error("Error accessing camera:", error);
@@ -159,46 +180,60 @@ function Game() {
       }
       setIsRecording(false);
     };
-    /** Track when to extract video */
+
     useEffect(() => {
       if (gameState.isRunning && !gameState.isPaused) {
-        setStartTime(Date.now()); // Set when audio starts
-      } else if (!gameState.isRunning) {
-        setEndTime(Date.now()); // Set when audio stops
-        if (startTime) {
-          saveSegmentAsBinary(startTime, Date.now());
-        }
+        console.log("Game started - setting start time");
+        startTimeRef.current = Date.now();
+        recordedChunksRef.current = []; // Reset chunks
+    
+        const intervalId = setInterval(() => {
+          if (startTimeRef.current) {
+            console.log("Saving gameplay segment");
+            const currentTime = Date.now();
+            saveSegmentAsBinary(startTimeRef.current, currentTime);
+            startTimeRef.current = currentTime; // Update for next segment
+            recordedChunksRef.current = []; // Reset chunks for next segment
+          }
+        }, 2000); // Save every 2 seconds
+    
+        return () => clearInterval(intervalId);
       }
     }, [gameState.isRunning, gameState.isPaused]);
-
+    
     const saveSegmentAsBinary = async (start: number, end: number) => {
-        if (!recordedChunksRef.current.length) return;
+        console.log("Attempting to save segment", { start, end, chunks: recordedChunksRef.current.length });
+        
+        if (!recordedChunksRef.current.length) {
+            console.warn("No chunks to save");
+            return;
+        }
 
         // Convert all chunks to a single Blob
         const fullBlob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+        console.log("Created blob of size:", fullBlob.size);
 
-        // Create a FileReader to extract portion of video
-        const reader = new FileReader();
-        reader.readAsArrayBuffer(fullBlob);
-        reader.onload = async () => {
-          const fullBuffer = reader.result as ArrayBuffer;
-          const duration = (end - start) / 1000; // Convert to seconds
+        // Create FormData to send the file
+        const formData = new FormData();
+        formData.append('video', fullBlob);
 
-          // Trim the video (not natively supported in JS, so sending full video for backend to trim)
-          const byteArray = new Uint8Array(fullBuffer);
-          const binBlob = new Blob([byteArray], { type: "application/octet-stream" });
+        try {
+            console.log("Sending request to upload video segment");
+            const response = await fetch(`http://127.0.0.1:8000/video/upload?start=${start}&end=${end}`, {
+                method: 'POST',
+                body: formData
+            });
 
-          // Download the .bin file (replace this with API upload if needed)
-          const url = URL.createObjectURL(binBlob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `segment_${start}_${end}.bin`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        };
-      };
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('Video segment uploaded successfully:', result);
+        } catch (error) {
+            console.error('Error uploading video segment:', error);
+        }
+    };
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-[#E9967A] overflow-hidden">
