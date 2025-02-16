@@ -11,23 +11,23 @@ const Dot: FC<DotProps> = ({ delay, targetTime, fallDuration }) => {
   const { gameState } = useContext(GameContext);
   const [position, setPosition] = useState(-100);
   const [isSprite] = useState(() => Math.random() < 0.4);
-  const [visual] = useState(() => {
-    if (isSprite) {
-      const sprites = ['chicken.png', 'chip.png', 'toy.png', 'tree.png', 'yarn.png'];
-      return sprites[Math.floor(Math.random() * sprites.length)];
-    } else {
-      const colors = [
-        '#FF6B6B', // red
-        '#4ECDC4', // teal
-        '#45B7D1', // blue
-        '#96CEB4', // green
-        '#FFEEAD', // yellow
-        '#D4A5A5', // pink
-        '#9B59B6', // purple
-        '#E67E22', // orange
-      ];
-      return colors[Math.floor(Math.random() * colors.length)];
-    }
+  const [color] = useState(() => {
+    const colors = [
+      '#FF6B6B', // red
+      '#4ECDC4', // teal
+      '#45B7D1', // blue
+      '#96CEB4', // green
+      '#FFEEAD', // yellow
+      '#D4A5A5', // pink
+      '#9B59B6', // purple
+      '#E67E22', // orange
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  });
+
+  const [sprite] = useState(() => {
+    const sprites = ['chicken.png', 'chip.png', 'toy.png', 'tree.png', 'yarn.png'];
+    return sprites[Math.floor(Math.random() * sprites.length)];
   });
 
   // Always get the latest gameState via a ref.
@@ -87,25 +87,40 @@ const Dot: FC<DotProps> = ({ delay, targetTime, fallDuration }) => {
       className="absolute rounded-full"
       style={{
         bottom: `${position}%`,
-        left: isSprite ? "20%" : "25%",
-        width: isSprite ? "150px" : "80px",
-        height: isSprite ? "150px" : "80px",
-        ...(isSprite 
-          ? {
-              backgroundImage: `url(/dots/${visual})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              borderRadius: 0,
-            }
-          : {
-              background: `radial-gradient(circle at 30% 30%, ${visual}ee, ${visual}aa, ${visual}88)`,
-              boxShadow: `0 0 10px ${visual}66`,
-              transition: 'bottom 0.05s linear',
-              border: '4px solid rgba(0, 0, 0, 0.8)',
-            }
-        )
+        left: "5%",
+        width: "150px",
+        height: "150px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
-    />
+    >
+      <div
+        className="rounded-full"
+        style={{
+          width: "80px",
+          height: "80px",
+          background: `radial-gradient(circle at 30% 30%, ${color}ee, ${color}aa, ${color}88)`,
+          boxShadow: `0 0 10px ${color}66`,
+          transition: 'bottom 0.05s linear',
+          border: isSprite ? 'none' : '4px solid rgba(0, 0, 0, 0.8)',
+        }}
+      />
+      
+      {isSprite && (
+        <div
+          className="absolute"
+          style={{
+            width: "100%",
+            height: "100%",
+            backgroundImage: `url(/dots/${sprite})`,
+            backgroundSize: 'contain',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+      )}
+    </div>
   );
 };
 
