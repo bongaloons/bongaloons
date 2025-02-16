@@ -1,7 +1,7 @@
 import serial
 import threading
 import queue
-import time
+
 
 class SerialHandler:
     def __init__(self, port='/dev/cu.usbmodem101', baudrate=9600):

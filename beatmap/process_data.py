@@ -5,8 +5,6 @@ import mediapipe as mp
 from joblib import Parallel, delayed
 from joblib.externals.loky import get_reusable_executor
 import tensorflow as tf
-import random
-import warnings
 
 GESTURES = set([
     "call", "four", "hand_heart", "like", "mute", "one", "peace_inverted", "stop", "three",

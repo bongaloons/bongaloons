@@ -181,7 +181,7 @@ async def handle_game_over(websocket: WebSocket, current_time: float):
     """Helper function to handle game over state"""
     for move in list(global_truth_map.keys()):
         while global_truth_map[move]:
-            judgement = score_live_note(move, current_time, None, bpm=GAME_STATE["bpm"], threshold_fraction=1/8)
+            judgement = score_live_note(move, current_time, None, bpm=GAME_STATE["bpm"], threshold_fraction=1/2)
             if judgement == "MISS":
                 GAME_STATE["total_score"] += calculate_score(judgement, GAME_STATE["current_streak"])
                 GAME_STATE["current_streak"] = 0
@@ -256,6 +256,16 @@ async def game_websocket(websocket: WebSocket):
     game_checker_task = asyncio.create_task(game_status_checker(websocket))
     try:
         while True:
+            serial_key = serial_handler.get_key()
+            if serial_key in ["a", "l"]:
+                move = "left" if serial_key == "a" else "right"
+                if GAME_STATE["is_running"]:
+                    current_time = time.perf_counter() - GAME_STATE["start_time"]
+                    # TODO: remove following line, this is to just temp patch the serial input which seems delayed
+                    current_time -= 0.05
+                    print(f"Processing serial hit: {move} at time {current_time}")  # Debug print
+                    await process_hit(websocket, move, current_time)
+            
             try:
                 data = await asyncio.wait_for(websocket.receive_json(), timeout=0.01)
             except asyncio.TimeoutError:

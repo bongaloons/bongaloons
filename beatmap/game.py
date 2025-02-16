@@ -141,7 +141,7 @@ def main():
         user_moves[move].sort(key=lambda n: n.start)
     
     # Score the beatmaps.
-    scores = score_beatmaps(truth_moves, user_moves, bpm=bpm, threshold_fraction=1/8)
+    scores = score_beatmaps(truth_moves, user_moves, bpm=bpm, threshold_fraction=1/2)
     print("\n--- Scoring Results ---")
     for move, results in scores.items():
         print(f"\nMove '{move}':")
