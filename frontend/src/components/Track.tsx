@@ -45,8 +45,8 @@ const Track: FC<TrackProps> = ({ position, text }) => {
           <Dot 
             key={i} 
             targetTime={dot.target_time} // time when dot should be hit
-            fallDuration={2000}  // time for a dot to traverse track
-            delay={2000} // time when first dot reaches end of track
+            // fallDuration={gameState.fallDuration}  // time for a dot to traverse track
+            // delay={gameState.delay} // time when first dot reaches end of track
           />
         ))}
     </div>

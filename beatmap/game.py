@@ -80,7 +80,6 @@ def draw_game(screen, dots, current_time):
 # Main Game Code (Pygame)
 # -------------------------------
 
-
 def run_game(truth_moves, game_duration):
     """
     Runs the game for game_duration seconds.
@@ -111,7 +110,7 @@ def run_game(truth_moves, game_duration):
                 if event.key in KEY_TO_MOVE:
                     move = KEY_TO_MOVE[event.key]
                     hit_time = current_time
-                    hit = Note(start=hit_time, duration=0.0, subdivision=0, move_type=move)
+                    hit = Note(start=hit_time, duration=0.0, subdivision=0)
                     user_moves.setdefault(move, []).append(hit)
                     print(f"[HIT] {move.upper()} at {hit_time:.2f} sec")
         
@@ -120,12 +119,11 @@ def run_game(truth_moves, game_duration):
     
     pygame.quit()
 
-
 def main():
     # Load truth beatmap from MIDI.
-    midi_path = "jellyfish.mid"  # Replace with your MIDI file path.
+    midi_path = "test.mid"  # Replace with your MIDI file path.
     truth_moves = parse_midi(midi_path)
-    bpm = 125.0  # default BPM (since parse_midi returns only the beatmap)
+    bpm = 120.0  # default BPM (since parse_midi returns only the beatmap)
     
     # Determine game duration: 2 seconds after the last truth note.
     max_time = 0.0
@@ -143,12 +141,11 @@ def main():
         user_moves[move].sort(key=lambda n: n.start)
     
     # Score the beatmaps.
-    scores = score_beatmaps(truth_moves, user_moves, bpm=bpm, threshold_fraction=1)
+    scores = score_beatmaps(truth_moves, user_moves, bpm=bpm, threshold_fraction=1/8)
     print("\n--- Scoring Results ---")
     for move, results in scores.items():
         print(f"\nMove '{move}':")
         for truth_note, user_note, diff, judgement in results:
-            print(truth_note, user_note, diff, judgement)
             if truth_note is not None and user_note is not None:
                 print(f"  Truth at {truth_note.start:.2f} sec matched with hit at {user_note.start:.2f} sec "
                       f"(diff: {diff:+.2f} sec) -> {judgement}")

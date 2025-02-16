@@ -237,7 +237,12 @@ def load_truth_note(move: str, note: Note) -> None:
     # Sort the list to ensure the earliest note is first.
     global_truth_map[move].sort(key=lambda n: n.start)
 
-DELAY_OFFSET = 2
+import json
+
+with open("../frontend/public/settings.json", "r") as f:
+    settings = json.load(f)
+
+DELAY_OFFSET = settings.get("delay", 0) / 1000
 
 def score_live_note(
     move: str,
@@ -323,10 +328,10 @@ def score_live_note(
         return judgement
     else:
         # No hit note provided. Check if it's already past the acceptable window.
-        if current_time > truth_note.start + threshold:
+        if current_time > truth_note.start + DELAY_OFFSET + threshold:
             # Time is up for this note.
             global_truth_map[move].pop(0)
-            print(truth_note.start)
+            print(truth_note.start, threshold)
             return Judgement.MISS
         else:
             return "waiting"

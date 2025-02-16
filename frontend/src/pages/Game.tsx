@@ -34,7 +34,7 @@ function Game() {
             audioRef.current.play().catch((err) =>
               console.error("Audio play error:", err)
             );
-          }, 1500);
+          }, gameState.delay);
           return () => clearTimeout(timer);
         }
       }

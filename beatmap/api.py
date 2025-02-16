@@ -181,6 +181,7 @@ async def game_status_checker(websocket: WebSocket):
                 if judgement == "waiting":
                     break
                 else:
+                    print("hi")
                     if judgement == "MISS":
                         score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
                         GAME_STATE["total_score"] += score_delta

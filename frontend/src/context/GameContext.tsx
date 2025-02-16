@@ -32,6 +32,8 @@ interface GameState {
     }>;
   } | null;
   pressedKeys: Set<string>;
+  fallDuration: number;
+  delay: number;
 }
 
 interface GameContextType {
@@ -46,6 +48,9 @@ interface GameContextType {
   setShowSongSelect: (show: boolean) => void;
   playAgain: () => void;
 }
+
+const DEFAULT_FALL_DURATION = 2000;
+const DEFAULT_DELAY = 2000;
 
 export const GameContext = createContext<GameContextType>({
   isStarted: false,
@@ -67,6 +72,8 @@ export const GameContext = createContext<GameContextType>({
     currentStreak: null,
     maxStreak: null,
     pressedKeys: new Set<string>(),
+    fallDuration: DEFAULT_FALL_DURATION,
+    delay: DEFAULT_DELAY,
   },
   ws: null,
   startGame: async () => {},
@@ -100,44 +107,45 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     currentStreak: null,
     maxStreak: null,
     pressedKeys: new Set<string>(),
+    fallDuration: DEFAULT_FALL_DURATION,
+    delay: DEFAULT_DELAY,
   });
 
   const updatePose = (pose: Pose) => {
     setGameState(prev => ({ ...prev, currentPose: pose }));
   };
 
-  // togglePause now updates totalPausedTime on resume.
+  // Toggle pause: record pause timestamp when pausing, and update totalPausedTime when resuming.
   const togglePause = () => {
     setGameState(prev => {
       if (!prev.isPaused) {
-        // Pausing: record the pause start timestamp.
         return { ...prev, isPaused: true, pauseTimestamp: performance.now() };
       } else {
-        // Resuming: clear the pauseTimestamp.
-        return { ...prev, isPaused: false, pauseTimestamp: null };
+        const pausedDuration = performance.now() - (prev.pauseTimestamp || performance.now());
+        return {
+          ...prev,
+          isPaused: false,
+          totalPausedTime: prev.totalPausedTime + pausedDuration,
+          pauseTimestamp: null
+        };
       }
     });
   };
-  
-  // New effect to continuously update totalPausedTime when paused.
+
+  // New effect: fetch fallDuration and delay from samples.json in the public folder.
   useEffect(() => {
-    let intervalId: number;
-    if (gameState.isPaused && gameState.pauseTimestamp) {
-      intervalId = window.setInterval(() => {
+    fetch('/settings.json')
+      .then(res => res.json())
+      .then(data => {
+        // Assuming your JSON looks like: { "fall_duration": 2000, "delay": 3000 }
         setGameState(prev => ({
           ...prev,
-          // Add incremental paused time.
-          totalPausedTime: prev.totalPausedTime + (performance.now() - (prev.pauseTimestamp || performance.now())),
-          pauseTimestamp: performance.now()
+          fallDuration: data.fall_duration,
+          delay: data.delay
         }));
-      }, 50);
-    }
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [gameState.isPaused, gameState.pauseTimestamp]);
+      })
+      .catch(err => console.error("Error fetching settings.json:", err));
+  }, []);
 
   const startGame = async (songId: number = 0) => {
     setIsStarted(true);
@@ -176,7 +184,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
             songName: data.songName,
             fallingDots: data.falling_dots,
             startTime: performance.now(), // Set the game start time
-            totalPausedTime: 0,           // Reset total paused time
+            totalPausedTime: 0,
             pauseTimestamp: null
           }));
         } catch (error) {
@@ -213,14 +221,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
             totalScore: data.totalScore,
             currentStreak: data.currentStreak,
             maxStreak: data.maxStreak,
-          }));
-        } else if (data.type === "note_missed") {
-          // Update state when a note is missed.
-          setGameState(prev => ({
-            ...prev,
-            lastJudgement: data.judgement,
-            totalScore: data.totalScore,
-            currentStreak: 0  // Reset current streak on miss.
           }));
         } else if (data.type === "game_over") {
           setGameState(prev => ({
@@ -318,7 +318,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   const playAgain = () => {
     setGameState(prev => ({
       ...prev,
-      totalScore: null,
+      totalScore: 0,
       currentStreak: 0,
       maxStreak: 0,
       scores: null,
