@@ -18,6 +18,7 @@ from models import (
     Song
 )
 from score import calculate_score
+from serial_handler import SerialHandler
 
 app = FastAPI()
 
@@ -50,6 +51,18 @@ GAME_STATE = {
     "max_streak": 0
 }
 
+# Add this near the top with other global variables
+serial_handler = SerialHandler()
+
+@app.on_event("startup")
+async def startup_event():
+    """Start the serial handler when the application starts"""
+    serial_handler.start()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop the serial handler when the application shuts down"""
+    serial_handler.stop()
 
 def get_song_info_from_catalog(id: int) -> tuple:
     """
@@ -205,71 +218,85 @@ async def game_websocket(websocket: WebSocket):
     
     try:
         while True:
-            data = await websocket.receive_json()
-
-            # If the game isn't running, ignore messages.
-            if not GAME_STATE["is_running"]:
+            serial_key = serial_handler.get_key()
+            if serial_key in ["a", "l"]:
+                move = "left" if serial_key == "a" else "right"
+                if GAME_STATE["is_running"]:
+                    current_time = time.perf_counter() - GAME_STATE["start_time"]
+                    print(f"Processing serial hit: {move} at time {current_time}")  # Debug print
+                    await process_hit(websocket, move, current_time)
+            
+            # Check for WebSocket data with a very short timeout
+            try:
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=0.01)
+                
+                if not GAME_STATE["is_running"]:
+                    continue
+                    
+                current_time = time.perf_counter() - GAME_STATE["start_time"]
+                
+                if data.get("key") in ["a", "l"]:
+                    move = "left" if data["key"] == "a" else "right"
+                    await process_hit(websocket, move, current_time)
+                
+                if current_time >= GAME_STATE["game_duration"]:
+                    await handle_game_over(websocket, current_time)
+                    break
+                    
+            except asyncio.TimeoutError:
+                # This is expected, continue to check serial input
                 continue
-
-            # Handle pause toggle messages.
-            if data.get("type") == "toggle_pause":
-                if not GAME_STATE["is_paused"]:
-                    GAME_STATE["is_paused"] = True
-                    GAME_STATE["pause_timestamp"] = time.perf_counter()
-                    await websocket.send_json({"type": "pause_toggled", "status": "paused"})
-                else:
-                    paused_duration = time.perf_counter() - GAME_STATE["pause_timestamp"]
-                    GAME_STATE["total_paused_time"] += paused_duration
-                    GAME_STATE["is_paused"] = False
-                    GAME_STATE["pause_timestamp"] = None
-                    await websocket.send_json({"type": "pause_toggled", "status": "running"})
-                continue
-
-            # Only process key events if not paused.
-            if GAME_STATE["is_paused"]:
-                continue
-
-            # Compute effective current time (excluding paused time).
-            current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
-
-            if data.get("key") in ["a", "l"]:
-                move = "left" if data["key"] == "a" else "right"
-                hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
-                judgement = score_live_note(
-                    move,
-                    current_time,
-                    hit,
-                    bpm=GAME_STATE["bpm"],
-                    threshold_fraction=1 / 2
-                )
-                print("Judgement: ", judgement)
-
-                score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
-                GAME_STATE["total_score"] += score_delta
-                if judgement in ["MISS", "OOPS"]:
-                    GAME_STATE["current_streak"] = 0
-                else:
-                    GAME_STATE["current_streak"] += 1
-                    GAME_STATE["max_streak"] = max(GAME_STATE["max_streak"], GAME_STATE["current_streak"])
-
-                await websocket.send_json({
-                    "type": "hit_registered",
-                    "move": move,
-                    "time": current_time,
-                    "lastJudgement": judgement,
-                    "totalScore": GAME_STATE["total_score"],
-                    "currentStreak": GAME_STATE["current_streak"],
-                    "maxStreak": GAME_STATE["max_streak"],
-                    "scoreDelta": score_delta
-                })
-
-        # The loop will naturally break when GAME_STATE["is_running"] becomes False.
+            except Exception as e:
+                if "receive" not in str(e):  # Ignore receive timeouts
+                    print(f"WebSocket error: {e}")
+                    break
+                
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
         game_checker_task.cancel()
         await websocket.close()
 
+async def process_hit(websocket: WebSocket, move: str, current_time: float):
+    """Helper function to process a hit (from either keyboard or serial)"""
+    hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
+    judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1/2)
+    
+    score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
+    GAME_STATE["total_score"] += score_delta
+    
+    if judgement in ["MISS", "OOPS"]:
+        GAME_STATE["current_streak"] = 0
+    else:
+        GAME_STATE["current_streak"] += 1
+        GAME_STATE["max_streak"] = max(GAME_STATE["max_streak"], GAME_STATE["current_streak"])
+    
+    await websocket.send_json({
+        "type": "hit_registered",
+        "move": move,
+        "time": current_time,
+        "lastJudgement": judgement,
+        "totalScore": GAME_STATE["total_score"],
+        "currentStreak": GAME_STATE["current_streak"],
+        "maxStreak": GAME_STATE["max_streak"],
+        "scoreDelta": score_delta
+    })
+
+async def handle_game_over(websocket: WebSocket, current_time: float):
+    """Helper function to handle game over state"""
+    for move in list(global_truth_map.keys()):
+        while global_truth_map[move]:
+            judgement = score_live_note(move, current_time, None, bpm=GAME_STATE["bpm"], threshold_fraction=1/8)
+            if judgement == "MISS":
+                GAME_STATE["total_score"] += calculate_score(judgement, GAME_STATE["current_streak"])
+                GAME_STATE["current_streak"] = 0
+    
+    await websocket.send_json({
+        "type": "game_over",
+        "message": "Game over!",
+        "totalScore": GAME_STATE["total_score"]
+    })
+    GAME_STATE["is_running"] = False
 
 @app.get("/game/status")
 async def get_game_status() -> GameStatusResponse:
