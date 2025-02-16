@@ -8,18 +8,24 @@ interface DotProps {
 
 const Dot: FC<DotProps> = ({ delay, targetTime, fallDuration }) => {
   const [position, setPosition] = useState(-100);
-  const [color] = useState(() => {
-    const colors = [
-      '#FF6B6B', // red
-      '#4ECDC4', // teal
-      '#45B7D1', // blue
-      '#96CEB4', // green
-      '#FFEEAD', // yellow
-      '#D4A5A5', // pink
-      '#9B59B6', // purple
-      '#E67E22', // orange
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
+  const [isSprite] = useState(() => Math.random() < 0.4);
+  const [visual] = useState(() => {
+    if (isSprite) {
+      const sprites = ['chicken.png', 'chip.png', 'toy.png', 'tree.png', 'yarn.png'];
+      return sprites[Math.floor(Math.random() * sprites.length)];
+    } else {
+      const colors = [
+        '#FF6B6B', // red
+        '#4ECDC4', // teal
+        '#45B7D1', // blue
+        '#96CEB4', // green
+        '#FFEEAD', // yellow
+        '#D4A5A5', // pink
+        '#9B59B6', // purple
+        '#E67E22', // orange
+      ];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
   });
 
   useEffect(() => {
@@ -53,12 +59,22 @@ const Dot: FC<DotProps> = ({ delay, targetTime, fallDuration }) => {
       className="absolute rounded-full"
       style={{
         bottom: `${position}%`,
-        left: "25%",
-        width: "80px",
-        height: "80px",
-        background: `radial-gradient(circle at 30% 30%, ${color}ee, ${color}aa, ${color}88)`,
-        boxShadow: `0 0 10px ${color}66`,
-        transition: 'bottom 0.05s linear'
+        left: isSprite ? "20%" : "25%",
+        width: isSprite ? "150px" : "80px",
+        height: isSprite ? "150px" : "80px",
+        ...(isSprite 
+          ? {
+              backgroundImage: `url(/dots/${visual})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              borderRadius: 0,
+            }
+          : {
+              background: `radial-gradient(circle at 30% 30%, ${visual}ee, ${visual}aa, ${visual}88)`,
+              boxShadow: `0 0 10px ${visual}66`,
+              transition: 'bottom 0.05s linear'
+            }
+        )
       }}
     />
   );
