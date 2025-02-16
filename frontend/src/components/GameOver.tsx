@@ -20,7 +20,7 @@ const RANK_THRESHOLDS = {
 
 function calculateRank(score: number, maxStreak: number): { rank: string, comment: string } {
   for (const [rank, criteria] of Object.entries(RANK_THRESHOLDS)) {
-    if (score >= criteria.score && maxStreak >= criteria.streak) {
+    if (score >= criteria.score || maxStreak >= criteria.streak) {
       return { rank, comment: criteria.comment };
     }
   }
