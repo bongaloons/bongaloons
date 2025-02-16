@@ -8,6 +8,7 @@ import BongoCat from '../components/BongoCat';
 import { StreakDisplay } from '../components/StreakDisplay';
 import BigJudgement from '../components/BigJudgement';
 import { playSoundFile, clearAudio } from '../utils/audioPlayer';
+import { getRandomOverlay } from '../utils/display';
 
 function Game() {
   const { isStarted, gameState, ws, startGame, updatePose, togglePause, endGame } = useContext(GameContext)
@@ -19,6 +20,7 @@ function Game() {
   // A ref to store the time when the resume was triggered.
   const resumeTriggerTimeRef = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null);
+  const overlay = getRandomOverlay();
 
   // When the game starts, clear any audio (like the title screen music)
   useEffect(() => {
@@ -330,7 +332,7 @@ function Game() {
         />
         <div className="absolute top-[50%] left-[0%] -translate-x-[0%] -translate-y-[75%] w-full z-10 ">
           <div className="mx-auto max-w-[400px]">
-            <BongoCat pose={gameState.currentPose} />
+            <BongoCat pose={gameState.currentPose} overlay={overlay} />
           </div>
         </div>
       </div>

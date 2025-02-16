@@ -6,6 +6,7 @@ import PushButton from "../components/PushButton";
 import DvdLogo from "../components/cosmetics/DvdLogo";
 import Leaderboard from "../components/Leaderboard";
 import { clearAudio, playSoundFile } from '../utils/audioPlayer';
+import { getRandomOverlay } from "../utils/display";
 
 const GIFS = [
     'gallery/cat-jump.gif',
@@ -213,7 +214,7 @@ export default function TitleScreen() {
                     }}
                 >
                     <div style={{ width: `${cat.size}px` }}>
-                        <BongoCat pose={pose} />
+                        <BongoCat pose={pose} overlay={getRandomOverlay()} />
                     </div>
                 </div>
             ))}
