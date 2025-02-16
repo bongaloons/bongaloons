@@ -52,6 +52,7 @@ GAME_STATE = {
     "songPath": "",             # Audio file path
     "midiPath": "",             # MIDI file path from the catalog
     "songName": "",             # Name of the song from the catalog
+    "bpm": 0,
     "total_score": 0,
     "current_streak": 0,
     "max_streak": 0
@@ -151,7 +152,8 @@ async def start_game(id: int = 0):
         "falling_dots": falling_dots,
         "songPath": song_path,
         "midiPath": midi_path,
-        "songName": song_name
+        "songName": song_name,
+        "bpm": GAME_STATE["bpm"]  # Added bpm field
     }
 
 async def process_hit(websocket: WebSocket, move: str, current_time: float):
@@ -198,7 +200,7 @@ async def game_status_checker(websocket: WebSocket):
     """
     threshold_fraction = 1 / 2  # Threshold for missed note checking.
     while True:
-        print("START OPF LOOP")
+        # print("START OPF LOOP")
         if not GAME_STATE["is_running"]:
             await asyncio.sleep(0.05)
             continue
@@ -216,9 +218,9 @@ async def game_status_checker(websocket: WebSocket):
             GAME_STATE["is_running"] = False
             break
         for move in list(global_truth_map.keys()):
-            print(list(global_truth_map.keys()))
+            # print(list(global_truth_map.keys()))
             while global_truth_map.get(move):
-                print("a")
+                # print("a")
                 judgement = score_live_note(
                     move,
                     current_time - T_FALL,
@@ -226,11 +228,11 @@ async def game_status_checker(websocket: WebSocket):
                     bpm=GAME_STATE["bpm"],
                     threshold_fraction=threshold_fraction
                 )
-                print("b", judgement)
+                # print("b", judgement)
                 if judgement == "waiting":
                     break
                 else:
-                    print("b2")
+                    # print("b2")
                     if judgement == "MISS":
                         score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
                         GAME_STATE["total_score"] += score_delta
@@ -243,8 +245,8 @@ async def game_status_checker(websocket: WebSocket):
                             "totalScore": GAME_STATE["total_score"],
                             "currentStreak": GAME_STATE["current_streak"],
                         })
-                print("c")
-            print("D")
+                # print("c")
+            # print("D")
         await asyncio.sleep(0.02)
     print("difhdifh")
 

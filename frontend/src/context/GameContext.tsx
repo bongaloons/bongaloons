@@ -13,6 +13,7 @@ interface GameState {
   songPath: string;
   mapPath: string;
   songName: string;
+  bpm: number;
   currentPose: Pose;
   fallingDots: Array<{
     move: string;
@@ -66,6 +67,7 @@ export const GameContext = createContext<GameContextType>({
     songPath: "",
     mapPath: "",
     songName: "",
+    bpm: 0,
     currentPose: "idle",
     fallingDots: [],
     connectionStatus: 'disconnected',
@@ -102,6 +104,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     songPath: "",
     mapPath: "",
     songName: "",
+    bpm: 0,
     currentPose: "idle",
     fallingDots: [],
     connectionStatus: 'disconnected',
@@ -188,6 +191,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
             songPath: data.songPath,
             mapPath: data.midiPath,
             songName: data.songName,
+            bpm: data.bpm,
             fallingDots: data.falling_dots,
             startTime: performance.now(), // Set the game start time
             totalPausedTime: 0,

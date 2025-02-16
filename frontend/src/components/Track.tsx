@@ -3,7 +3,7 @@ import Dot from './Dot';
 import { GameContext } from '../context/GameContext';
 
 interface TrackProps {
-  position: 'left' | 'right';
+  position: 'left' | 'right' | 'super';
   text: string;
 }
 
@@ -38,7 +38,7 @@ const Track: FC<TrackProps> = ({ position, text }) => {
         getVibrateClass()
       }`}
     >
-      {text}
+      <span className="text-center">{text}</span>
       {gameState.fallingDots
         .filter(dot => dot.track === position)
         .map((dot, i) => (
