@@ -1,5 +1,6 @@
 import json
 import time
+import asyncio
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from midi import (
@@ -30,6 +31,7 @@ app.add_middleware(
 
 # Game settings
 T_FALL = 2.0
+T_END = 2.0  # Delay after song end
 DEFAULT_BPM = 120.0  # fallback BPM
 
 GAME_STATE = {
@@ -40,9 +42,9 @@ GAME_STATE = {
     "start_time": None,
     "game_duration": 0,
     "bpm": DEFAULT_BPM,
-    "songPath": "",   # Audio file path
-    "midiPath": "",   # MIDI file path from the catalog
-    "songName": "",   # Name of the song from the catalog
+    "songPath": "",             # Audio file path
+    "midiPath": "",             # MIDI file path from the catalog
+    "songName": "",             # Name of the song from the catalog
     "total_score": 0,
     "current_streak": 0,
     "max_streak": 0
@@ -137,21 +139,80 @@ async def start_game(id: int = 0):
     }
 
 
+async def game_status_checker(websocket: WebSocket):
+    """
+    Background task that continuously checks for missed notes and whether the game is over.
+    It only acts when the game is running and not paused.
+    """
+    threshold_fraction = 1 / 2  # Use the desired threshold for missed note checking.
+    while True:
+        if not GAME_STATE["is_running"]:
+            # Game has not started or has ended; sleep and check again.
+            await asyncio.sleep(0.05)
+            continue
+
+        if GAME_STATE["is_paused"]:
+            await asyncio.sleep(0.05)
+            continue
+
+        current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
+
+        # Check if game duration has passed (with extra delay T_END).
+        if current_time >= GAME_STATE["game_duration"] + T_END:
+            await websocket.send_json({
+                "type": "game_over",
+                "message": "Game over!",
+                "totalScore": GAME_STATE["total_score"]
+            })
+            GAME_STATE["is_running"] = False
+            break
+
+        # Process missed notes.
+        for move in list(global_truth_map.keys()):
+            while global_truth_map.get(move):
+                # Adjust time by subtracting T_FALL.
+                judgement = score_live_note(
+                    move,
+                    current_time - T_FALL,
+                    None,
+                    bpm=GAME_STATE["bpm"],
+                    threshold_fraction=threshold_fraction
+                )
+                if judgement == "waiting":
+                    break
+                else:
+                    if judgement == "MISS":
+                        score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
+                        GAME_STATE["total_score"] += score_delta
+                        GAME_STATE["current_streak"] = 0
+                        await websocket.send_json({
+                            "type": "note_missed",
+                            "move": move,
+                            "time": current_time - T_FALL,
+                            "judgement": judgement,
+                            "totalScore": GAME_STATE["total_score"],
+                            "currentStreak": GAME_STATE["current_streak"],
+                        })
+        await asyncio.sleep(0.02)  # Check roughly every 20ms
+
+
 @app.websocket("/game/ws")
 async def game_websocket(websocket: WebSocket):
     await websocket.accept()
+
+    # Start the background task that checks for missed notes and game over.
+    game_checker_task = asyncio.create_task(game_status_checker(websocket))
     
     try:
         while True:
             data = await websocket.receive_json()
-            
-            # Ignore messages if game is not running.
+
+            # If the game isn't running, ignore messages.
             if not GAME_STATE["is_running"]:
                 continue
-            
-            # Handle pause toggle message.
+
+            # Handle pause toggle messages.
             if data.get("type") == "toggle_pause":
-                print("hdfihdfidifhd")
                 if not GAME_STATE["is_paused"]:
                     GAME_STATE["is_paused"] = True
                     GAME_STATE["pause_timestamp"] = time.perf_counter()
@@ -163,19 +224,26 @@ async def game_websocket(websocket: WebSocket):
                     GAME_STATE["pause_timestamp"] = None
                     await websocket.send_json({"type": "pause_toggled", "status": "running"})
                 continue
-            
+
             # Only process key events if not paused.
             if GAME_STATE["is_paused"]:
                 continue
-            
-            # Compute effective current time (excluding paused duration)
+
+            # Compute effective current time (excluding paused time).
             current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
-            
-            if data.get("key") in ["a", "l"] and not GAME_STATE["is_paused"]:
+
+            if data.get("key") in ["a", "l"]:
                 move = "left" if data["key"] == "a" else "right"
                 hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
-                judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1/2)
-                
+                judgement = score_live_note(
+                    move,
+                    current_time,
+                    hit,
+                    bpm=GAME_STATE["bpm"],
+                    threshold_fraction=1 / 2
+                )
+                print("Judgement: ", judgement)
+
                 score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
                 GAME_STATE["total_score"] += score_delta
                 if judgement in ["MISS", "OOPS"]:
@@ -183,7 +251,7 @@ async def game_websocket(websocket: WebSocket):
                 else:
                     GAME_STATE["current_streak"] += 1
                     GAME_STATE["max_streak"] = max(GAME_STATE["max_streak"], GAME_STATE["current_streak"])
-                
+
                 await websocket.send_json({
                     "type": "hit_registered",
                     "move": move,
@@ -194,25 +262,12 @@ async def game_websocket(websocket: WebSocket):
                     "maxStreak": GAME_STATE["max_streak"],
                     "scoreDelta": score_delta
                 })
-            
-            if current_time >= GAME_STATE["game_duration"]:
-                for move in list(global_truth_map.keys()):
-                    while global_truth_map[move]:
-                        judgement = score_live_note(move, current_time, None, bpm=GAME_STATE["bpm"], threshold_fraction=1/8)
-                        if judgement == "MISS":
-                            GAME_STATE["total_score"] += calculate_score(judgement, GAME_STATE["current_streak"])
-                            GAME_STATE["current_streak"] = 0
-                
-                await websocket.send_json({
-                    "type": "game_over",
-                    "message": "Game over!",
-                    "totalScore": GAME_STATE["total_score"]
-                })
-                GAME_STATE["is_running"] = False
-                break
+
+        # The loop will naturally break when GAME_STATE["is_running"] becomes False.
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
+        game_checker_task.cancel()
         await websocket.close()
 
 
@@ -220,7 +275,7 @@ async def game_websocket(websocket: WebSocket):
 async def get_game_status() -> GameStatusResponse:
     if not GAME_STATE["is_running"]:
         return GameStatusResponse(status="not_running")
-        
+
     current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
     return GameStatusResponse(
         status="running",
