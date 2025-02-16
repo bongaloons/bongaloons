@@ -1,6 +1,7 @@
 import { useContext, useState } from 'react';
 import { GameContext } from '../context/GameContext';
 import PushButton from './PushButton';
+import PushInput from './PushInput';
 // Rank thresholds and comments
 const RANK_THRESHOLDS = {
   SSS: { score: 100000, streak: 50, comment: "Are you even human? That was incredible!" },
@@ -71,12 +72,11 @@ export default function GameOver() {
         </div>
         {!submitted ? (
           <div className="mb-6">
-            <input
-              type="text"
+            <PushInput
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="Enter your name"
-              className="px-4 py-2 border rounded-lg mb-4 font-display"
+              className="px-4 py-2 border rounded-lg mr-4 font-display"
               maxLength={20}
             />
             <PushButton onClick={handleSubmitScore} color="black">
