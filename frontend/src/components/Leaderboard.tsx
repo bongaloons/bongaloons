@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import PushButton from './PushButton';
+import SquigglyText from './SquigglyText';
 
 interface LeaderboardEntry {
   name: string;
@@ -27,7 +28,7 @@ export default function Leaderboard({ onClose }: { onClose: () => void }) {
   return (
     <div className="bg-gradient-to-b from-[#FFB07C] to-[#E88165] overflow-hidden flex items-center justify-center z-20">
       <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-2xl w-full">
-        <h1 className="text-4xl font-display mb-6">Top Scores</h1>
+        <SquigglyText className="text-4xl font-display mb-6">Top Scores</SquigglyText>
         
         {loading ? (
           <p className="text-xl">Loading scores...</p>
