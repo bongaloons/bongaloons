@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
 import { GameContext } from '../context/GameContext';
 import PushButton from './PushButton';
 // Rank thresholds and comments
@@ -25,7 +25,28 @@ function calculateRank(score: number, maxStreak: number): {rank: string, comment
 
 export default function GameOver() {
   const { gameState, playAgain } = useContext(GameContext);
+  const [playerName, setPlayerName] = useState('');
+  const [submitted, setSubmitted] = useState(false);
   const { rank, comment } = calculateRank(gameState.totalScore || 0, gameState.maxStreak || 0);
+
+  const handleSubmitScore = async () => {
+    if (!playerName.trim()) return;
+    
+    try {
+      const params = new URLSearchParams({
+        name: playerName,
+        score: gameState.totalScore?.toString() || '0',
+        max_streak: gameState.maxStreak?.toString() || '0'
+      });
+
+      await fetch(`http://127.0.0.1:8000/leaderboard/add?${params.toString()}`, {
+        method: 'POST'
+      });
+      setSubmitted(true);
+    } catch (error) {
+      console.error('Error submitting score:', error);
+    }
+  };
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-gradient-to-b from-[#FFB07C] to-[#E88165] overflow-hidden flex items-center justify-center">
@@ -48,12 +69,25 @@ export default function GameOver() {
           <p className="text-2xl font-display">Total Score: {gameState.totalScore}</p>
           <p className="text-xl font-display">Highest Streak: {gameState.maxStreak}</p>
         </div>
-        <PushButton 
-          onClick={playAgain}
-          color='black'
-        >
-          Play Again
-        </PushButton>
+        {!submitted ? (
+          <div className="mb-6">
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              placeholder="Enter your name"
+              className="px-4 py-2 border rounded-lg mb-4 font-display"
+              maxLength={20}
+            />
+            <PushButton onClick={handleSubmitScore} color="black">
+              Submit Score
+            </PushButton>
+          </div>
+        ) : (
+          <PushButton onClick={playAgain} color="black">
+            Play Again
+          </PushButton>
+        )}
       </div>
     </div>
   );

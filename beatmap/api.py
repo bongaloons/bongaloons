@@ -19,6 +19,7 @@ from models import (
 )
 from score import calculate_score
 from serial_handler import SerialHandler
+from redis_client import add_score, get_leaderboard
 
 app = FastAPI()
 
@@ -315,3 +316,13 @@ async def get_game_status() -> GameStatusResponse:
 @app.get("/health")
 async def health_check() -> HealthCheckResponse:
     return HealthCheckResponse(status="ok")
+
+@app.post("/leaderboard/add")
+async def add_to_leaderboard(name: str, score: int, max_streak: int):
+    add_score(name, score, max_streak)
+    return {"status": "success"}
+
+@app.get("/leaderboard")
+async def get_top_scores():
+    scores = get_leaderboard()
+    return {"scores": scores}
