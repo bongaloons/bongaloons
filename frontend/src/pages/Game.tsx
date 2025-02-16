@@ -1,6 +1,6 @@
 import '../App.css'
 import Track from '../components/Track'
-import { useContext, useEffect, useRef } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { GameContext } from '../context/GameContext'
 import Judgement from '../components/Judgement';
 import Table from '../components/cosmetics/Table';
@@ -12,30 +12,71 @@ function Game() {
   const { isStarted, gameState, ws, startGame, updatePose, togglePause, endGame } = useContext(GameContext)
   // Create a ref for the audio element.
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  // Track audio resume delay and whether the audio is ready.
+  const [audioDelay, setAudioDelay] = useState(0)
+  const [audioReady, setAudioReady] = useState(true)
+  // A ref to store the time when the resume was triggered.
+  const resumeTriggerTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (gameState.isRunning) {
       if (gameState.isPaused) {
-        // When paused, simply pause the audio without resetting currentTime.
+        // When paused, pause the audio (if it exists) and block note movement.
         if (audioRef.current) {
           audioRef.current.pause();
         }
+        setAudioReady(false);
       } else {
-        // When running and not paused:
-        // If audio already exists, resume playback.
+        // When unpausing:
         if (audioRef.current) {
+          // Audio already exists (i.e. we're resuming playback after the initial start)
+          resumeTriggerTimeRef.current = performance.now();
           audioRef.current.play().catch((err) =>
             console.error("Audio resume error:", err)
           );
+          const handlePlaying = () => {
+            if (resumeTriggerTimeRef.current) {
+              const delay = performance.now() - resumeTriggerTimeRef.current;
+              setAudioDelay(delay);
+              console.log("Audio resume delay:", delay, "ms");
+              resumeTriggerTimeRef.current = null;
+            }
+            setAudioReady(true);
+            audioRef.current?.removeEventListener("playing", handlePlaying);
+          };
+          audioRef.current.addEventListener("playing", handlePlaying);
         } else {
-          // Otherwise, delay initial playback by 1500ms.
-          const timer = setTimeout(() => {
-            audioRef.current = new Audio(gameState.songPath);
-            audioRef.current.play().catch((err) =>
-              console.error("Audio play error:", err)
-            );
-          }, gameState.delay);
-          return () => clearTimeout(timer);
+          // For initial playback: start a countdown that respects pauses.
+          // We assume gameState.startTime is set when the game starts.
+          const intervalId = setInterval(() => {
+            // If paused, do nothing (the effective elapsed time won't increase).
+            if (gameState.isPaused) return;
+            // Calculate effective elapsed time:
+            const effectiveTime = performance.now() - gameState.startTime - gameState.totalPausedTime;
+            const remainingDelay = gameState.delay - effectiveTime;
+            console.log("Remaining delay:", remainingDelay, "ms");
+            if (remainingDelay <= 0) {
+              clearInterval(intervalId);
+              // Time to start the audio.
+              audioRef.current = new Audio(gameState.songPath);
+              resumeTriggerTimeRef.current = performance.now();
+              audioRef.current.play().catch((err) =>
+                console.error("Audio play error:", err)
+              );
+              const handlePlaying = () => {
+                if (resumeTriggerTimeRef.current) {
+                  const delay = performance.now() - resumeTriggerTimeRef.current;
+                  setAudioDelay(delay);
+                  console.log("Audio resume delay:", delay, "ms");
+                  resumeTriggerTimeRef.current = null;
+                }
+                setAudioReady(true);
+                audioRef.current?.removeEventListener("playing", handlePlaying);
+              };
+              audioRef.current.addEventListener("playing", handlePlaying);
+            }
+          }, 50);
+          return () => clearInterval(intervalId);
         }
       }
     } else {
@@ -45,91 +86,56 @@ function Game() {
         audioRef.current.currentTime = 0;
       }
     }
-  }, [gameState.isRunning, gameState.songPath, gameState.isPaused]);
+  }, [
+    gameState.isRunning,
+    gameState.songPath,
+    gameState.isPaused,
+    gameState.delay,
+    gameState.startTime,
+    gameState.totalPausedTime,
+  ]);
+  
 
-  // Key event handling: ignore keys if game is paused.
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!ws || !['a', 'l'].includes(e.key) || gameState.isPaused || gameState.pressedKeys.has(e.key)) return;
-      
-      const newPressedKeys = new Set(gameState.pressedKeys).add(e.key);
-      ws.send(JSON.stringify({ key: e.key }));
-      
-      if (newPressedKeys.has('a') && newPressedKeys.has('l')) {
-        updatePose('both');
-      } else if (newPressedKeys.has('a')) {
-        updatePose('left');
-      } else if (newPressedKeys.has('l')) {
-        updatePose('right');
-      } else {
-        updatePose('idle');
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (!['a', 'l'].includes(e.key)) return;
-      
-      const newPressedKeys = new Set(gameState.pressedKeys);
-      newPressedKeys.delete(e.key);
-      
-      if (newPressedKeys.has('a') && newPressedKeys.has('l')) {
-        updatePose('both');
-      } else if (newPressedKeys.has('a')) {
-        updatePose('left');
-      } else if (newPressedKeys.has('l')) {
-        updatePose('right');
-      } else {
-        updatePose('idle');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [ws, gameState.pressedKeys, gameState.isPaused, updatePose]);
+  // Now you can use the "audioReady" flag in your note/update logic.
+  // For example, your note animation can check that audioReady is true before moving:
+  // if (!audioReady) return; // wait until the audio has resumed
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-[#E9967A] overflow-hidden">
       {/* Pause Menu Overlay */}
       {gameState.isPaused && (
-  <div 
-    className="fixed inset-0 z-30 flex items-center justify-center" 
-    style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }} // Semi-transparent overlay
-  >
-    <div className="bg-white p-8 rounded-lg shadow-lg text-center space-y-4">
-      <h1 className="text-4xl font-display mb-4">Paused</h1>
-      <div className="flex justify-center gap-4">
-        <button
-          onClick={() => {
-            togglePause();
-            if (ws) {
-              ws.send(JSON.stringify({ type: "toggle_pause" }));
-            }
-          }}
-          className="bg-blue-500 hover:bg-blue-600 text-white font-display text-xl px-6 py-3 rounded-lg transition-colors duration-200"
+        <div 
+          className="fixed inset-0 z-30 flex items-center justify-center" 
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
         >
-          Resume
-        </button>
-        <button
-          onClick={() => {
-            // Logic for menu navigation; here we call endGame to exit the game.
-            endGame();
-          }}
-          className="bg-gray-500 hover:bg-gray-600 text-white font-display text-xl px-6 py-3 rounded-lg transition-colors duration-200"
-        >
-          Menu
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+          <div className="bg-white p-8 rounded-lg shadow-lg text-center space-y-4">
+            <h1 className="text-4xl font-display mb-4">Paused</h1>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => {
+                  togglePause()
+                  if (ws) {
+                    ws.send(JSON.stringify({ type: "toggle_pause" }))
+                  }
+                }}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-display text-xl px-6 py-3 rounded-lg transition-colors duration-200"
+              >
+                Resume
+              </button>
+              <button
+                onClick={() => {
+                  endGame()
+                }}
+                className="bg-gray-500 hover:bg-gray-600 text-white font-display text-xl px-6 py-3 rounded-lg transition-colors duration-200"
+              >
+                Menu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-
-      {/* Now Playing text, centered horizontally just below the top */}
+      {/* Now Playing text */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
         {gameState.songName && (
           <div className="text-white font-display text-2xl">
@@ -138,6 +144,7 @@ function Game() {
         )}
       </div>
 
+      {/* Connection status */}
       <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-white z-20 font-display ${
         gameState.connectionStatus === 'connected' ? 'bg-green-500' :
         gameState.connectionStatus === 'connecting' ? 'bg-yellow-500' :
@@ -146,13 +153,14 @@ function Game() {
         WS: {gameState.connectionStatus}
       </div>
 
+      {/* Score & Streak display */}
       <div className="absolute flex flex-col gap-2 top-4 left-4 z-20">
         <div className="flex flex-row gap-2 px-4 py-2 bg-white rounded-lg shadow-lg justify-between items-center">
           <button
             onClick={() => {
-              togglePause();
+              togglePause()
               if (ws) {
-                ws.send(JSON.stringify({ type: "toggle_pause" }));
+                ws.send(JSON.stringify({ type: "toggle_pause" }))
               }
             }}
             className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 z-20 font-display text-xl inline-flex items-center gap-2"
@@ -162,7 +170,6 @@ function Game() {
             </svg>
             {gameState.isPaused ? "Resume" : "Pause"}
           </button>
-
           <div className="font-display text-xl">Total Score: {gameState.totalScore}</div>
         </div>
         <StreakDisplay />

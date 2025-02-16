@@ -5,7 +5,7 @@ interface DotProps {
   targetTime: number;  // Time (ms) when the dot is meant to be hit
 }
 
-const Dot: FC<DotProps> = ({targetTime}) => {
+const Dot: FC<DotProps> = ({ targetTime }) => {
   const dotStartPosition = 0;
   const { gameState } = useContext(GameContext);
   const [position, setPosition] = useState(dotStartPosition);
@@ -30,8 +30,25 @@ const Dot: FC<DotProps> = ({targetTime}) => {
     gameStateRef.current = gameState;
   }, [gameState]);
 
-  // Ref to hold the effective game time (time elapsed that doesn't advance when paused)
-  const effectiveTimeRef = useRef(0);
+  /**
+   * When the game is paused, we want to increment the pause duration
+   * continuously so that effective time (used to spawn dots) does not
+   * advance during a pause.
+   */
+  const [pauseAccumulator, setPauseAccumulator] = useState(0);
+  useEffect(() => {
+    let pauseInterval: NodeJS.Timeout;
+    if (gameState.isPaused) {
+      const pauseStart = performance.now();
+      pauseInterval = setInterval(() => {
+        setPauseAccumulator(() => performance.now() - pauseStart);
+      }, 50);
+    } else {
+      // Reset the local pause accumulator when unpaused.
+      setPauseAccumulator(0);
+    }
+    return () => clearInterval(pauseInterval);
+  }, [gameState.isPaused]);
 
   // Local state to determine when to spawn (i.e. start animation)
   const [spawned, setSpawned] = useState(false);
@@ -44,18 +61,27 @@ const Dot: FC<DotProps> = ({targetTime}) => {
     // Calculate the intended spawn time (ms)
     const spawnTime = targetTime - gameState.fallDuration + gameState.delay;
     const checkSpawn = () => {
-      // Compute effective time: subtract totalPausedTime from elapsed time.
+      // Compute effective time:
+      // elapsed time = current time - game start time
+      // then subtract both the totalPausedTime from earlier pauses and the
+      // accumulated pause time for the current pause.
       const effectiveTime = gameState.startTime
-        ? performance.now() - gameState.startTime - gameState.totalPausedTime
+        ? performance.now() - gameState.startTime - gameState.totalPausedTime - pauseAccumulator
         : 0;
-      // console.log("Effective time:", effectiveTime);
       if (effectiveTime >= spawnTime) {
         setSpawned(true);
       }
     };
     const intervalId = setInterval(checkSpawn, 50);
     return () => clearInterval(intervalId);
-  }, [gameState.delay, targetTime, gameState.fallDuration, gameState.startTime, gameState.totalPausedTime]);
+  }, [
+    gameState.delay, 
+    targetTime, 
+    gameState.fallDuration, 
+    gameState.startTime, 
+    gameState.totalPausedTime,
+    pauseAccumulator,
+  ]);
 
   // Effect to animate the dot once it has spawned.
   useEffect(() => {
@@ -72,9 +98,8 @@ const Dot: FC<DotProps> = ({targetTime}) => {
         const totalDistance = limit - dotStartPosition;
         // Use the latest pause status from our ref.
         const isPaused = gameStateRef.current.isPaused;
+        // When paused, don't move the dot.
         const speedPer50ms = isPaused ? 0 : (totalDistance / gameState.fallDuration) * 50;
-        console.log(" dfnjid ", gameState.fallDuration, speedPer50ms);
-        // console.log((prev - dotStartPosition) / totalDistance, (performance.now() - (gameState.startTime ? gameState.startTime : 0) - (targetTime - fallDuration + delay)) / fallDuration)
         return prev + speedPer50ms;
       });
     };
@@ -113,7 +138,7 @@ const Dot: FC<DotProps> = ({targetTime}) => {
           style={{
             width: "100%",
             height: "100%",
-            backgroundImage: `url(/dots/chicken.png)`, // Replace with dynamic sprite if desired
+            backgroundImage: `url(/dots/chicken.png)`,
             backgroundSize: 'contain',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
