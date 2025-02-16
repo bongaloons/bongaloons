@@ -32,7 +32,7 @@ export default function Leaderboard({ onClose }: { onClose: () => void }) {
         {loading ? (
           <p className="text-xl">Loading scores...</p>
         ) : (
-          <div className="mb-6">
+          <div className="mb-6 overflow-y-auto max-h-[400px]">
             <table className="w-full">
               <thead>
                 <tr className="border-b-2 border-gray-200">
