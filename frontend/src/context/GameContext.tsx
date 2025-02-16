@@ -113,7 +113,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         // Pausing: record the pause start timestamp.
         return { ...prev, isPaused: true, pauseTimestamp: performance.now() };
       } else {
-        // Resuming: clear the pauseTimestamp (totalPausedTime has been updated continuously).
+        // Resuming: clear the pauseTimestamp.
         return { ...prev, isPaused: false, pauseTimestamp: null };
       }
     });
@@ -126,12 +126,8 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       intervalId = window.setInterval(() => {
         setGameState(prev => ({
           ...prev,
-          // Calculate additional paused time since pause started, add to previously accumulated totalPausedTime.
-          totalPausedTime: prev.totalPausedTime + (performance.now() - (prev.pauseTimestamp || performance.now()))
-        }));
-        // Reset the pauseTimestamp to now so that we add incremental time on next interval.
-        setGameState(prev => ({
-          ...prev,
+          // Add incremental paused time.
+          totalPausedTime: prev.totalPausedTime + (performance.now() - (prev.pauseTimestamp || performance.now())),
           pauseTimestamp: performance.now()
         }));
       }, 50);
@@ -218,6 +214,14 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
             currentStreak: data.currentStreak,
             maxStreak: data.maxStreak,
           }));
+        } else if (data.type === "note_missed") {
+          // Update state when a note is missed.
+          setGameState(prev => ({
+            ...prev,
+            lastJudgement: data.judgement,
+            totalScore: data.totalScore,
+            currentStreak: 0  // Reset current streak on miss.
+          }));
         } else if (data.type === "game_over") {
           setGameState(prev => ({
             ...prev,
@@ -299,7 +303,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   }, [ws]);
 
   const endGame = () => {
-
     setGameState(prev => ({
       ...prev,
       isPaused: false,
