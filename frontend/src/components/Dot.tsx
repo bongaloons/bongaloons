@@ -12,14 +12,14 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
   const [isSprite] = useState(() => Math.random() < 0.4);
   const [color] = useState(() => {
     const colors = [
-      '#FF6B6B', // red
-      '#4ECDC4', // teal
-      '#45B7D1', // blue
-      '#96CEB4', // green
-      '#FFEEAD', // yellow
-      '#D4A5A5', // pink
-      '#9B59B6', // purple
-      '#E67E22', // orange
+      '#FF4444', // bright red
+      '#00FFE5', // bright teal
+      '#00BFFF', // bright blue
+      '#66FF99', // bright green
+      '#FFFF66', // bright yellow
+      '#FF99CC', // bright pink
+      '#B266FF', // bright purple
+      '#FF9933', // bright orange
     ];
     return colors[Math.floor(Math.random() * colors.length)];
   });
@@ -83,6 +83,8 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
     pauseAccumulator,
   ]);
 
+  const [hasHitLine, setHasHitLine] = useState(false);
+  
   // Effect to animate the dot once it has spawned.
   useEffect(() => {
     if (!spawned) return;
@@ -90,22 +92,23 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
       setPosition(prev => {
         const limit = 80;
         if (prev >= limit) {
-          if (prev !== limit) {
-            console.log("Dot hit the line!");
+          if (prev === limit && !hasHitLine) {
+            setHasHitLine(true);
+            setTimeout(() => {
+              setPosition(limit + 0.01);
+            }, 50);
           }
           return limit;
         }
         const totalDistance = limit - dotStartPosition;
-        // Use the latest pause status from our ref.
         const isPaused = gameStateRef.current.isPaused;
-        // When paused, don't move the dot.
         const speedPer50ms = isPaused ? 0 : (totalDistance / gameState.fallDuration) * 50;
         return prev + speedPer50ms;
       });
     };
     const interval = setInterval(animate, 50);
     return () => clearInterval(interval);
-  }, [spawned, gameState.fallDuration]);
+  }, [spawned, gameState.fallDuration, hasHitLine]);
 
   // Log the dot's x and y coordinates whenever position updates.
   useEffect(() => {
@@ -117,6 +120,10 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
 
   // Do not render the dot until it has spawned.
   if (!spawned) return null;
+  if (position > 80) return null;
+
+  const scale = position >= 75 ? 1 + ((position - 75) / 10) * 0.5 : 1;
+  const opacity = hasHitLine ? 0 : 1;
 
   return (
     <div 
@@ -124,12 +131,17 @@ const Dot: FC<DotProps> = ({ targetTime }) => {
       className="absolute rounded-full"
       style={{
         bottom: `${position}%`,
-        left: "25%", // Adjust as needed to center in track
+        left: "25%",
         width: "80px",
         height: "80px",
         background: `radial-gradient(circle at 30% 30%, ${color}ee, ${color}aa, ${color}88)`,
         boxShadow: `0 0 10px ${color}66`,
-        transition: 'bottom 0.05s linear'
+        transition: hasHitLine ? 
+          'bottom 0.05s linear, opacity 0.05s linear, transform 0.05s linear' : 
+          'bottom 0.05s linear, transform 0.05s linear',
+        transform: `scale(${scale})`,
+        opacity,
+        border: isSprite ? 'none' : '4px solid black'
       }}
     >
       {isSprite && (
