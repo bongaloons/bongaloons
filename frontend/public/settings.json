@@ -1,7 +1,7 @@
 {
     "fall_duration": 1500,
     "delay": 3000,
-    "reaction_time": 150,
+    "reaction_time": 0,
     "end_pause": 2000,
     "default_bpm": 120
 }
