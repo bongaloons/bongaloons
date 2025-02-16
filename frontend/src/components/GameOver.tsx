@@ -33,7 +33,7 @@ export default function GameOver() {
 
   // Play the results audio on component mount
   useEffect(() => {
-    playSoundFile('/sfx/results.mp3', 0.8)
+    playSoundFile('/sfx/results.mp3', 0.2)
   }, []);
 
   const handleSubmitScore = async () => {
@@ -78,11 +78,12 @@ export default function GameOver() {
         </div>
         {!submitted ? (
           <div className="mb-6">
-            <PushInput
+            <input
+              type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="Enter your name"
-              className="px-4 py-2 border rounded-lg mr-4 font-display"
+              className="px-4 py-2 border rounded-lg mb-4 font-display"
               maxLength={20}
             />
             <PushButton onClick={handleSubmitScore} color="black">
