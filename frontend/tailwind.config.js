@@ -9,6 +9,7 @@ export default {
       fontFamily: {
         sans: ['Nunito', 'sans-serif'],
         display: ['Barriecito', 'cursive'],
+        broken: ['"Rubik Broken Fax"', 'system-ui', 'sans-serif'],
       },
     },
   },

@@ -2,10 +2,11 @@ import '../App.css'
 import Track from '../components/Track'
 import { useContext, useEffect, useRef } from 'react'
 import { GameContext } from '../context/GameContext'
-import Judegment from '../components/Judgement';
+import Judgement from '../components/Judgement';
 import Table from '../components/cosmetics/Table';
 import BongoCat from '../components/BongoCat';
 import { StreakDisplay } from '../components/StreakDisplay';
+import BigJudgement from '../components/BigJudgement';
 
 function Game() {
   const { gameState, endGame } = useContext(GameContext)
@@ -21,7 +22,7 @@ function Game() {
         audioRef.current.play().catch((err) =>
           console.error("Audio play error:", err)
         );
-      }, 1500);
+      }, 2000);
       return () => clearTimeout(timer);
     } else {
       if (audioRef.current) {
@@ -63,7 +64,10 @@ function Game() {
       </div>
 
       {gameState.lastJudgement && (
-        <Judegment judgement={gameState.lastJudgement} />
+        <Judgement judgement={gameState.lastJudgement} />
+      )}
+      {gameState.lastJudgement && (
+        <BigJudgement judgement={gameState.lastJudgement} />
       )}
 
       <div className="relative w-full h-screen bg-[#E9967A]">

@@ -1,4 +1,4 @@
-export default function Judegment({ judgement }: { judgement: string }) {
+export default function Judgement({ judgement }: { judgement: string }) {
     return (
         <div 
           key={judgement}
@@ -8,7 +8,7 @@ export default function Judegment({ judgement }: { judgement: string }) {
             left: `${Math.random() * 40 + 30}%`,
           }}
         >
-          <pre className="text-2xl font-display">
+          <pre className="text-4xl font-display">
             {judgement}
           </pre>
         </div>
