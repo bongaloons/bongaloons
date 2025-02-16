@@ -118,3 +118,7 @@ Thumbs.db
 requirements.txt
 
 /data
+
+/model
+
+/venv_train
