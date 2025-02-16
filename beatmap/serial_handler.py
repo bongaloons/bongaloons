@@ -1,6 +1,7 @@
 import serial
 import threading
 import queue
+import time
 
 
 class SerialHandler:
@@ -10,6 +11,8 @@ class SerialHandler:
         self.serial_queue = queue.Queue()
         self.running = False
         self.thread = None
+        self.last_press_time = {'left': 0, 'right': 0}
+        self.BOTH_PRESS_THRESHOLD = 0.05  # 50ms threshold for simultaneous presses
 
     def start(self):
         self.running = True
@@ -28,12 +31,25 @@ class SerialHandler:
                 while self.running:
                     if ser.in_waiting:
                         data = ser.readline().decode('utf-8').strip()
+                        current_time = time.time()
+                        
                         if data == '0':
-                            print("Hit detected on right sensor!")
-                            self.serial_queue.put('l')  # right
+                            self.last_press_time['right'] = current_time
+                            if (current_time - self.last_press_time['left']) < self.BOTH_PRESS_THRESHOLD:
+                                print("Both sensors hit simultaneously!")
+                                self.serial_queue.put('both')
+                            else:
+                                print("Hit detected on right sensor!")
+                                self.serial_queue.put('l')
+                                
                         elif data == '1':
-                            print("Hit detected on left sensor!")
-                            self.serial_queue.put('a')  # left
+                            self.last_press_time['left'] = current_time
+                            if (current_time - self.last_press_time['right']) < self.BOTH_PRESS_THRESHOLD:
+                                print("Both sensors hit simultaneously!")
+                                self.serial_queue.put('both')
+                            else:
+                                print("Hit detected on left sensor!")
+                                self.serial_queue.put('a')
 
         except serial.SerialException as e:
             print(f"Serial connection error: {e}")
