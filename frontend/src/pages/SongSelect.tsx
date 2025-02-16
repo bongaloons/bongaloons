@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState } from 'react';
 import { GameContext } from '../context/GameContext';
+import PushButton from '../components/PushButton';
 
 interface Song {
   id: number;
@@ -37,23 +38,26 @@ export default function SongSelect() {
 
   return (
     <div className="w-screen h-screen bg-gradient-to-b from-[#FFB07C] to-[#E88165] flex flex-col items-center justify-center gap-8">
-      <h1 className="text-6xl font-display text-white mb-8">Select a Song</h1>
-      <div className="flex flex-col gap-4 w-96">
-        {songs.map(song => (
-          <button
-            key={song.id}
-            onClick={() => startGame(song.id)}
-            className="bg-white hover:bg-gray-100 text-black font-display text-2xl py-4 px-6 rounded-lg shadow-md transition-colors duration-200"
+      <div className="p-8 bg-white rounded-lg shadow-md w-1/2">
+        <h1 className="text-6xl text-black mb-8 font-display">Select a Song</h1>
+        <div className="flex flex-col gap-4 w-96">
+          {songs.map(song => (
+            <PushButton
+              align="left"
+              key={song.id}
+              onClick={() => startGame(song.id)}
+            >
+              {song.name}
+            </PushButton>
+          ))}
+          <PushButton
+            onClick={() => setShowSongSelect(false)}
+            color="black"
+            className="relative bg-black hover:bg-gray-800 text-white font-display text-2xl py-4 px-6 rounded-lg shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] hover:shadow-[2px_2px_0px_0px_rgba(255,255,255,0.3)] active:shadow-[0px_0px_0px_0px_rgba(255,255,255,0.3)] transform hover:translate-y-0.5 active:translate-y-1 transition-all duration-150 [box-shadow:inset_0px_2px_8px_rgba(255,255,255,0.1)]"
           >
-            {song.name}
-          </button>
-        ))}
-        <button
-          onClick={() => setShowSongSelect(false)}
-          className="bg-black hover:bg-gray-100 text-white font-display text-2xl py-4 px-6 rounded-lg shadow-md transition-colors duration-200"
-        >
-          Back
-        </button>
+            Back
+          </PushButton>
+        </div>
       </div>
     </div>
   );

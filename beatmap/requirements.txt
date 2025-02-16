@@ -10,3 +10,4 @@ mido
 python-rtmidi
 llvmlite==0.44.0
 numpy
+pyserial

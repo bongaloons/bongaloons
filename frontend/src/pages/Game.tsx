@@ -192,19 +192,21 @@ function Game() {
       </div>
       <Table />
       <div 
-        className="w-40 h-[64%] bg-blue-200 fixed bottom-[-9%] right-[60%] z-1 overflow-hidden"
+        className="w-40 h-[64%] fixed bottom-[-9%] right-[60%] z-1 overflow-hidden"
         style={{
           transform: "rotate(13deg)",
-          transformOrigin: "bottom center"
+          transformOrigin: "bottom center",
+          background: "linear-gradient(to top, #bfdbfe, #60a5fa)"
         }}
       >
           <Track position="left" text="Left Track (A)" />
       </div>
       <div 
-        className="w-40 h-[60%] bg-yellow-200 fixed bottom-[-13%] right-[40%] z-1 overflow-hidden"
+        className="w-40 h-[60%] fixed bottom-[-13%] right-[40%] z-1 overflow-hidden"
         style={{
           transform: "rotate(13deg)",
-          transformOrigin: "bottom center"
+          transformOrigin: "bottom center",
+          background: "linear-gradient(to top, #fef08a, #facc15)"
         }}
       >
           <Track position="right" text="Right Track (L)" />
