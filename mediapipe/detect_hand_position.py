@@ -7,6 +7,7 @@ import time
 TOP_THRESHOLD = 0.33
 BOTTOM_THRESHOLD = 0.66
 
+
 def detect_hand_position_draw(frame, hands, mp_hands, mp_drawing):
     #Unmirror the frame
     frame = cv2.flip(frame, 1)
