@@ -13,7 +13,6 @@ interface GameState {
   songPath: string;
   mapPath: string;
   songName: string;
-  bpm: number;
   currentPose: Pose;
   fallingDots: Array<{
     move: string;
@@ -38,7 +37,6 @@ interface GameState {
   fallDuration: number;
   delay: number;
   reactionTime: number;
-  difficulty: number;
 }
 
 interface GameContextType {
@@ -69,7 +67,6 @@ export const GameContext = createContext<GameContextType>({
     songPath: "",
     mapPath: "",
     songName: "",
-    bpm: 0,
     currentPose: "idle",
     fallingDots: [],
     connectionStatus: 'disconnected',
@@ -83,7 +80,6 @@ export const GameContext = createContext<GameContextType>({
     fallDuration: DEFAULT_FALL_DURATION,
     delay: DEFAULT_DELAY,
     reactionTime: DEFAULT_REACTION_TIME,
-    difficulty: 1,
   },
   ws: null,
   startGame: async () => {},
@@ -108,7 +104,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     songPath: "",
     mapPath: "",
     songName: "",
-    bpm: 0,
     currentPose: "idle",
     fallingDots: [],
     connectionStatus: 'disconnected',
@@ -122,7 +117,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     fallDuration: DEFAULT_FALL_DURATION,
     delay: DEFAULT_DELAY,
     reactionTime: DEFAULT_REACTION_TIME,
-    difficulty: 1,
   });
 
   const updatePose = (pose: Pose) => {
@@ -197,8 +191,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
             songPath: data.songPath,
             mapPath: data.midiPath,
             songName: data.songName,
-            bpm: data.bpm,
-            difficulty: data.difficulty,
             fallingDots: data.falling_dots,
             startTime: performance.now(), // Set the game start time
             totalPausedTime: 0,
@@ -231,6 +223,15 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
       newWs.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        if (data.move && data.type === "pose_update") {
+          updatePose(data.move);
+          setTimeout(() => {
+            setGameState(prev => ({
+              ...prev,
+              currentPose: "idle",
+            }));
+          }, 100);
+        }
         if (data.type === "hit_registered") {
           setGameState(prev => ({
             ...prev,

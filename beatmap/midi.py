@@ -117,7 +117,7 @@ def score_beatmaps(
     truth: Dict[str, List[Note]],
     user: Dict[str, List[Note]],
     bpm: float,
-    threshold_fraction: float = 1/8  # used for both early and late threshold
+    threshold_fraction: float = 1  # used for both early and late threshold
 ) -> Dict[str, List[Tuple[Optional[Note], Optional[Note], Optional[float], str]]]:
     """
     Scores the user's beatmap against the truth beatmap.

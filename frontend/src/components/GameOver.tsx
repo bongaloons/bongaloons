@@ -7,14 +7,13 @@ import SquigglyText from './SquigglyText';
 
 // Rank thresholds and comments
 const RANK_THRESHOLDS = {
-  SSS: { score: 100000, streak: 50, comment: "Are you even human? That was incredible!" },
-  SS: { score: 75000, streak: 40, comment: "Almost perfect! Touch grass maybe?" },
-  S: { score: 50000, streak: 30, comment: "Impressive! You've clearly been practicing!" },
-  A: { score: 35000, streak: 20, comment: "Pretty good! Your cat would be proud." },
-  B: { score: 25000, streak: 15, comment: "Not bad, but your cat could do better." },
-  C: { score: 15000, streak: 10, comment: "Meow-diocre performance..." },
-  D: { score: 10000, streak: 5, comment: "Did your cat walk across the keyboard?" },
-  E: { score: 5000, streak: 3, comment: "Paw-sitively disappointing." },
+  SSS: { score: 200000, streak: 50, comment: "Are you even human? That was incredible!" },
+  S: { score: 15000, streak: 30, comment: "Impressive! You've clearly been practicing!" },
+  A: { score: 10000, streak: 20, comment: "Pretty good! Your cat would be proud." },
+  B: { score: 8000, streak: 15, comment: "Not bad, but your cat could do better." },
+  C: { score: 6000, streak: 10, comment: "Meow-diocre performance..." },
+  D: { score: 3000, streak: 5, comment: "Did your cat walk across the keyboard?" },
+  E: { score: 1000, streak: 3, comment: "Paw-sitively disappointing." },
   F: { score: 0, streak: 0, comment: "Maybe stick to petting cats instead?" }
 };
 

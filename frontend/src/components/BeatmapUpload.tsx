@@ -7,6 +7,7 @@ import SquigglyText from './SquigglyText';
 export default function BeatmapUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [noteCount, setNoteCount] = useState<number>(100);
   const { startGame, setShowSongSelect } = useContext(GameContext);
 
   const handleSubmit = async () => {
@@ -15,6 +16,7 @@ export default function BeatmapUpload() {
     setLoading(true);
     const formData = new FormData();
     formData.append('audio', file);
+    formData.append('max_notes', noteCount.toString());
 
     try {
       const response = await fetch('http://127.0.0.1:8000/beatmap/create', {
@@ -27,8 +29,9 @@ export default function BeatmapUpload() {
       }
 
       const data = await response.json();
-      // Start the game with the newly created beatmap
-      startGame(data.song.id);
+      // Instead of starting the game, close the upload form and let SongSelect refresh
+      setShowSongSelect(true);
+      
     } catch (error) {
       console.error('Error creating beatmap:', error);
     } finally {
@@ -38,13 +41,18 @@ export default function BeatmapUpload() {
 
   return (
     <div className="p-8 bg-white rounded-lg shadow-md w-1/2">
-    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
         <SquigglyText className="text-6xl text-black font-display">
-        Create Your Beatmap
+          Create Your Beatmap
         </SquigglyText>
         
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }} 
+          className="flex flex-col gap-4"
+        >
+          <div className="flex flex-col gap-2">
             <label className="text-xl font-display">Upload MP3 File</label>
             <input
               type="file"
@@ -60,27 +68,48 @@ export default function BeatmapUpload() {
                 hover:file:bg-red-100 p-4"
               required
             />
-        </div>
-        
-        <div className="flex flex-row gap-4">
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-xl font-display">Number of Notes</label>
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min="20"
+                max="1000"
+                value={noteCount}
+                onChange={(e) => setNoteCount(parseInt(e.target.value))}
+                className="range range-lg range-primary flex-1"
+              />
+              <span className="text-xl font-display w-20 text-center">
+                {noteCount}
+              </span>
+            </div>
+            <div className="text-sm text-gray-600 mt-1">
+              More notes = higher difficulty. Recommended: 50-200 notes
+            </div>
+          </div>
+          
+          <div className="flex flex-row gap-4">
             <PushButton
-                disabled={loading || !file}
-                className="flex-1"
-                onClick={() => handleSubmit()}
+              disabled={loading || !file}
+              className="flex-1"
+              type="submit"
             >
-            {loading ? 'Creating...' : 'Create Beatmap'}
+              {loading ? 'Creating...' : 'Create Beatmap'}
             </PushButton>
             
             <PushButton
-            onClick={() => setShowSongSelect(true)}
-            color="black"
-            className="flex-1"
+              onClick={() => setShowSongSelect(true)}
+              color="black"
+              className="flex-1"
+              type="button"
             >
-            Back to Songs
+              Back to Songs
             </PushButton>
-        </div>
+          </div>
         </form>
-    </div>
+      </div>
     </div>
   );
 } 

@@ -6,12 +6,20 @@ interface DotProps {
   track: string;
 }
 
+const SPRITES = [
+  "chicken",
+  "chip",
+  "toy",
+  "tree",
+  "yarn",
+]
+
 const Dot: FC<DotProps> = ({ targetTime, track }) => {
   const dotStartPosition = 0;
   const { gameState, ws } = useContext(GameContext);
   const [position, setPosition] = useState(dotStartPosition);
   const [isSprite] = useState(() => Math.random() < 0.4);
-  console.log("DDDDDDDDDDDDDDDDDDDDDDDD", track);
+  const [dotSprite] = useState(() => SPRITES[Math.floor(Math.random() * SPRITES.length)]);
 
   // Choose a color: for the "super" track, always rainbow; for left/right, pick from a set.
   const [color] = useState(() => {
@@ -97,7 +105,7 @@ const Dot: FC<DotProps> = ({ targetTime, track }) => {
     if (!spawned) return;
     const animate = () => {
       setPosition(prev => {
-        const limit = 80;
+        const limit = 90;
         if (prev >= limit) {
           if (prev === limit && !hasHitLine) {
             setHasHitLine(true);
@@ -125,14 +133,6 @@ const Dot: FC<DotProps> = ({ targetTime, track }) => {
     const interval = setInterval(animate, 50);
     return () => clearInterval(interval);
   }, [spawned, gameState.fallDuration, hasHitLine, track, ws, superSent, targetTime]);
-
-  // Log the dot's x and y coordinates whenever position updates.
-  useEffect(() => {
-    if (dotRef.current) {
-      const rect = dotRef.current.getBoundingClientRect();
-      console.log(`Dot position - x: ${rect.x.toFixed(2)}, y: ${rect.y.toFixed(2)}`);
-    }
-  }, [position]);
 
   // Do not render the dot until it has spawned.
   if (!spawned) return null;
@@ -178,7 +178,7 @@ const Dot: FC<DotProps> = ({ targetTime, track }) => {
           style={{
             width: "100%",
             height: "100%",
-            backgroundImage: `url(/dots/chicken.png)`,
+            backgroundImage: `url(/dots/${dotSprite}.png)`,
             backgroundSize: 'contain',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',

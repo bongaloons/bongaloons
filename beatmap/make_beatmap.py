@@ -2,7 +2,7 @@ import librosa
 import numpy as np
 from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
 
-MAX_NOTES = 100 # Default maximum notes in the final MIDI file
+MAX_NOTES = 500 # Default maximum notes in the final MIDI file
 
 
 def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES) -> float:

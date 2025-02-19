@@ -164,7 +164,7 @@ async def start_game(id: int = 0):
 async def process_hit(websocket: WebSocket, move: str, current_time: float):
     """Helper function to process a hit (from keyboard or serial)"""
     hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
-    judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1/2)
+    judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1)
     score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
     GAME_STATE["total_score"] += score_delta
     if judgement in ["MISS", "OOPS"]:
@@ -205,7 +205,6 @@ async def game_status_checker(websocket: WebSocket):
     """
     threshold_fraction = 1 / 2  # Threshold for missed note checking.
     while True:
-        # print("START OPF LOOP")
         if not GAME_STATE["is_running"]:
             await asyncio.sleep(0.05)
             continue
@@ -213,7 +212,6 @@ async def game_status_checker(websocket: WebSocket):
             await asyncio.sleep(0.05)
             continue
         current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
-        print("Effective time:", current_time, "Game duration + T_END:", GAME_STATE["game_duration"] + T_END)
         if current_time >= GAME_STATE["game_duration"] + T_END:
             await websocket.send_json({
                 "type": "game_over",
@@ -223,9 +221,7 @@ async def game_status_checker(websocket: WebSocket):
             GAME_STATE["is_running"] = False
             break
         for move in list(global_truth_map.keys()):
-            # print(list(global_truth_map.keys()))
             while global_truth_map.get(move):
-                # print("a")
                 judgement = score_live_note(
                     move,
                     current_time - T_FALL,
@@ -233,7 +229,6 @@ async def game_status_checker(websocket: WebSocket):
                     bpm=GAME_STATE["bpm"],
                     threshold_fraction=threshold_fraction
                 )
-                # print("b", judgement)
                 if judgement == "waiting":
                     break
                 else:
@@ -250,8 +245,6 @@ async def game_status_checker(websocket: WebSocket):
                             "totalScore": GAME_STATE["total_score"],
                             "currentStreak": GAME_STATE["current_streak"],
                         })
-                # print("c")
-            # print("D")
         await asyncio.sleep(0.02)
     print("difhdifh")
 
@@ -262,44 +255,46 @@ async def game_websocket(websocket: WebSocket):
     game_checker_task = asyncio.create_task(game_status_checker(websocket))
     try:
         while True:
+            serial_key = serial_handler.get_key()
+            if serial_key in ["left", "right", "both"]:
+                move = serial_key
+                if GAME_STATE["is_running"]:
+                    current_time = time.perf_counter() - GAME_STATE["start_time"]
+                    await websocket.send_json({
+                        "type": "pose_update",
+                        "move": move
+                    })
+                    if move == "both":
+                        await process_hit(websocket, "left", current_time)
+                        await process_hit(websocket, "right", current_time)
+                    else:
+                        await process_hit(websocket, move, current_time)
+            
+            # Check for WebSocket data with a very short timeout
             try:
                 data = await asyncio.wait_for(websocket.receive_json(), timeout=0.01)
+                
+                if not GAME_STATE["is_running"]:
+                    continue
+                    
+                current_time = time.perf_counter() - GAME_STATE["start_time"]
+                
+                if data.get("key") in ["a", "l"]:
+                    move = "left" if data["key"] == "a" else "right"
+                    await process_hit(websocket, move, current_time)
+                
+                if current_time >= GAME_STATE["game_duration"]:
+                    await handle_game_over(websocket, current_time)
+                    break
+                    
             except asyncio.TimeoutError:
-                data = None
-
-            if not GAME_STATE["is_running"]:
+                # This is expected, continue to check serial input
                 continue
+            except Exception as e:
+                if "receive" not in str(e):  # Ignore receive timeouts
+                    print(f"WebSocket error: {e}")
+                    break
 
-            # Handle pause toggle message.
-            if data and data.get("type") == "toggle_pause":
-                if not GAME_STATE["is_paused"]:
-                    GAME_STATE["is_paused"] = True
-                    GAME_STATE["pause_timestamp"] = time.perf_counter()
-                    await websocket.send_json({"type": "pause_toggled", "status": "paused"})
-                else:
-                    paused_duration = time.perf_counter() - GAME_STATE["pause_timestamp"]
-                    GAME_STATE["total_paused_time"] += paused_duration
-                    GAME_STATE["is_paused"] = False
-                    GAME_STATE["pause_timestamp"] = None
-                    await websocket.send_json({"type": "pause_toggled", "status": "running"})
-                continue
-
-            if GAME_STATE["is_paused"]:
-                continue
-
-            current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
-
-            if data and data.get("key") in ["a", "l"]:
-                move = "left" if data["key"] == "a" else "right"
-                await process_hit(websocket, move, current_time)
-            
-            print("hello", current_time, GAME_STATE["game_duration"] + T_END)
-
-            if current_time >= GAME_STATE["game_duration"] + T_END:
-                await handle_game_over(websocket, current_time)
-                break
-
-            await asyncio.sleep(0.005)
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
@@ -353,19 +348,16 @@ async def upload_video_segment(
     # Save the uploaded file
     try:
         contents = await video.read()
-        print(f"Read {len(contents)} bytes from upload")
         with open(filename, "wb") as f:
             f.write(contents)
-        print("File saved successfully")
         return {"status": "success", "filename": filename}
     except Exception as e:
-        print(f"Error saving video: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/beatmap/create")
 async def create_beatmap(
     audio: UploadFile = File(...),
-    max_notes: int = 100
+    max_notes: str = "500"
 ):
     """
     Creates a beatmap from an uploaded MP3 file.
@@ -373,6 +365,7 @@ async def create_beatmap(
     """
     # Create uploads directory if it doesn't exist
     os.makedirs("../frontend/public/uploads", exist_ok=True)
+    max_notes = int(max_notes)
     
     difficulty = 1
     if max_notes > 50:
