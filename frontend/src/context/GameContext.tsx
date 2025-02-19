@@ -250,16 +250,29 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
             currentStreak: 0,               // reset streak on miss
           }));
         } else if (data.type === "game_over") {
+          // First update game state
           setGameState(prev => ({
             ...prev,
-            scores: data.scores,
-            lastJudgement: data.lastJudgement,
+            scores: data.scores || null,
+            lastJudgement: data.lastJudgement || null,
             totalScore: data.totalScore,
             currentStreak: 0,
-            maxStreak: data.maxStreak,
-            isRunning: false
+            maxStreak: data.maxStreak || 0,
+            isRunning: false,
+            isPaused: false,
+            fallingDots: []
           }));
+          
           setIsStarted(false);
+          
+          // Send end_game message to server before closing
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "end_game" }));
+            // Wait a short delay before closing to ensure message is sent
+            setTimeout(() => {
+              ws.close();
+            }, 500);
+          }
         }
         console.log('Game state updated:', data);
       };

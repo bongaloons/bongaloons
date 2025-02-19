@@ -14,7 +14,7 @@ uv pip install -r requirements.txt
 
 Then, run the API.
 ```bash
-uvicorn api:app --reload
+uvicorn api:app --reload --workers 1
 ```
 
 

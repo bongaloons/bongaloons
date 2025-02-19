@@ -237,6 +237,18 @@ function Game() {
         }
     };
 
+    useEffect(() => {
+        return () => {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+            }
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        };
+    }, [ws]);
+
   return (
     <div className="fixed inset-0 w-screen h-screen bg-[#E9967A] overflow-hidden">
       {/* Pause Menu Overlay */}

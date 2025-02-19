@@ -21,6 +21,7 @@ from models import (
 from score import calculate_score
 from serial_handler import SerialHandler
 from redis_client import add_score, get_leaderboard
+import signal
 
 app = FastAPI()
 
@@ -32,11 +33,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load settings from settings.json (located in ../frontend/public/)
 with open("../frontend/public/settings.json", "r") as f:
     settings = json.load(f)
 
-# Convert fall_duration and end_pause from ms to seconds.
 T_FALL = settings.get("fall_duration", 2000) / 1000
 T_END = settings.get("end_pause", 0) / 1000
 DEFAULT_BPM = settings.get("default_bpm", 120)
@@ -59,7 +58,6 @@ GAME_STATE = {
     "max_streak": 0
 }
 
-# Start the serial handler at startup.
 serial_handler = SerialHandler()
 
 @app.on_event("startup")
@@ -69,6 +67,15 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     serial_handler.stop()
+
+
+def signal_handler(signum, frame):
+    print("Shutting down gracefully...")
+    serial_handler.stop()
+    exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler) 
 
 def get_song_info_from_catalog(id: int) -> tuple:
     """
@@ -194,16 +201,20 @@ async def handle_game_over(websocket: WebSocket, current_time: float):
     await websocket.send_json({
         "type": "game_over",
         "message": "Game over!",
-        "totalScore": GAME_STATE["total_score"]
+        "totalScore": GAME_STATE["total_score"],
+        "scores": global_truth_map,
+        "lastJudgement": None,
+        "maxStreak": GAME_STATE["max_streak"]
     })
     GAME_STATE["is_running"] = False
+
 
 async def game_status_checker(websocket: WebSocket):
     """
     Background task that continuously checks for missed notes and whether the game is over.
     Only acts when the game is running and not paused.
     """
-    threshold_fraction = 1 / 2  # Threshold for missed note checking.
+    threshold_fraction = 1 / 2
     while True:
         if not GAME_STATE["is_running"]:
             await asyncio.sleep(0.05)
@@ -211,15 +222,19 @@ async def game_status_checker(websocket: WebSocket):
         if GAME_STATE["is_paused"]:
             await asyncio.sleep(0.05)
             continue
+            
         current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
+        
+        if GAME_STATE["is_running"]:
+            remaining_notes = sum(len(notes) for notes in global_truth_map.values())
+            print(f"Current time: {current_time:.2f}, Remaining notes: {remaining_notes}")
+        
         if current_time >= GAME_STATE["game_duration"] + T_END:
-            await websocket.send_json({
-                "type": "game_over",
-                "message": "Game over!",
-                "totalScore": GAME_STATE["total_score"]
-            })
-            GAME_STATE["is_running"] = False
+            print(f"Game duration exceeded: {current_time:.2f} >= {GAME_STATE['game_duration'] + T_END:.2f}")
+            await handle_game_over(websocket, current_time)
             break
+            
+        # Check for missed notes
         for move in list(global_truth_map.keys()):
             while global_truth_map.get(move):
                 judgement = score_live_note(
@@ -231,22 +246,26 @@ async def game_status_checker(websocket: WebSocket):
                 )
                 if judgement == "waiting":
                     break
-                else:
-                    # print("b2")
-                    if judgement == "MISS":
-                        score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
-                        GAME_STATE["total_score"] += score_delta
-                        GAME_STATE["current_streak"] = 0
-                        await websocket.send_json({
-                            "type": "note_missed",
-                            "move": move,
-                            "time": current_time - T_FALL,
-                            "judgement": judgement,
-                            "totalScore": GAME_STATE["total_score"],
-                            "currentStreak": GAME_STATE["current_streak"],
-                        })
+                elif judgement == "MISS":
+                    score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
+                    GAME_STATE["total_score"] += score_delta
+                    GAME_STATE["current_streak"] = 0
+                    await websocket.send_json({
+                        "type": "note_missed",
+                        "move": move,
+                        "time": current_time - T_FALL,
+                        "judgement": judgement,
+                        "totalScore": GAME_STATE["total_score"],
+                        "currentStreak": GAME_STATE["current_streak"],
+                    })
+        
+        remaining_notes = sum(len(notes) for notes in global_truth_map.values())
+        if remaining_notes == 0 and GAME_STATE["is_running"] or current_time >= GAME_STATE["game_duration"] + T_END:
+            print(f"All notes completed at time {current_time:.2f}")
+            await handle_game_over(websocket, current_time)
+            break
+                    
         await asyncio.sleep(0.02)
-    print("difhdifh")
 
 
 @app.websocket("/game/ws")
@@ -270,10 +289,13 @@ async def game_websocket(websocket: WebSocket):
                     else:
                         await process_hit(websocket, move, current_time)
             
-            # Check for WebSocket data with a very short timeout
             try:
                 data = await asyncio.wait_for(websocket.receive_json(), timeout=0.01)
                 
+                if data.get("type") == "end_game":
+                    print("Client requested WebSocket closure")
+                    break
+                    
                 if not GAME_STATE["is_running"]:
                     continue
                     
@@ -283,15 +305,10 @@ async def game_websocket(websocket: WebSocket):
                     move = "left" if data["key"] == "a" else "right"
                     await process_hit(websocket, move, current_time)
                 
-                if current_time >= GAME_STATE["game_duration"]:
-                    await handle_game_over(websocket, current_time)
-                    break
-                    
             except asyncio.TimeoutError:
-                # This is expected, continue to check serial input
                 continue
             except Exception as e:
-                if "receive" not in str(e):  # Ignore receive timeouts
+                if "receive" not in str(e):
                     print(f"WebSocket error: {e}")
                     break
 
@@ -299,7 +316,6 @@ async def game_websocket(websocket: WebSocket):
         print(f"WebSocket error: {e}")
     finally:
         game_checker_task.cancel()
-        await websocket.close()
 
 @app.get("/game/status")
 async def get_game_status() -> GameStatusResponse:
@@ -363,21 +379,22 @@ async def create_beatmap(
     Creates a beatmap from an uploaded MP3 file.
     Returns the generated MIDI file path and other metadata.
     """
-    # Create uploads directory if it doesn't exist
+    print("Creating beatmap with max notes:", max_notes)
     os.makedirs("../frontend/public/uploads", exist_ok=True)
     max_notes = int(max_notes)
     
     difficulty = 1
-    if max_notes > 50:
+    if max_notes <= 50:
+        difficulty = 1
+    elif max_notes <= 100:
         difficulty = 2
-    elif max_notes > 100:
+    elif max_notes <= 150:
         difficulty = 3
-    elif max_notes > 150:
+    elif max_notes <= 200:
         difficulty = 4
-    elif max_notes > 200:
+    else:
         difficulty = 5
         
-    # Save the uploaded MP3
     timestamp = int(time.time())
     mp3_filename = f"upload_{timestamp}.mp3"
     midi_filename = f"upload_{timestamp}.mid"
@@ -386,29 +403,23 @@ async def create_beatmap(
     midi_path = f"../frontend/public/uploads/{midi_filename}"
     
     try:
-        # Save MP3
         content = await audio.read()
         with open(mp3_path, "wb") as f:
             f.write(content)
             
-        # Process audio to create MIDI
         from make_beatmap import process_audio_to_midi
         bpm = process_audio_to_midi(mp3_path, midi_path, max_notes)
         
-        # Get song name from the original filename, removing the extension
         song_name = audio.filename.rsplit('.', 1)[0] if audio.filename else f"Custom Song {timestamp}"
         
-        # Read and validate catalog
         catalog = []
         try:
             with open("catalog.json", "r") as f:
                 content = f.read().strip()
-                # Check if the content ends with a proper closing bracket
                 if content and content[-1] == ']':
                     try:
                         catalog = json.loads(content)
                     except json.JSONDecodeError:
-                        # If parsing fails, start with default catalog
                         catalog = [
                             {
                                 "id": 0,
@@ -420,7 +431,6 @@ async def create_beatmap(
                             }
                         ]
         except FileNotFoundError:
-            # If file doesn't exist, start with default catalog
             catalog = [
                 {
                     "id": 0,
@@ -432,13 +442,11 @@ async def create_beatmap(
                 }
             ]
             
-        # Find max ID from valid entries
         max_id = 0
         for entry in catalog:
             if isinstance(entry, dict) and 'id' in entry:
                 max_id = max(max_id, entry['id'])
         
-        # Create new catalog entry
         new_entry = {
             "id": max_id + 1,
             "name": song_name,
@@ -461,7 +469,6 @@ async def create_beatmap(
         with open(temp_path, "w") as f:
             json.dump(catalog, f, indent=4)
         
-        # Atomic rename to prevent corruption
         os.replace(temp_path, "catalog.json")
             
         return {
@@ -470,7 +477,6 @@ async def create_beatmap(
         }
         
     except Exception as e:
-        # Clean up files if there was an error
         try:
             if os.path.exists(mp3_path):
                 os.remove(mp3_path)

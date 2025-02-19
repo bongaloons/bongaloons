@@ -2,6 +2,7 @@ import serial
 import threading
 import queue
 import time
+import signal
 
 
 class SerialHandler:
@@ -22,8 +23,10 @@ class SerialHandler:
 
     def stop(self):
         self.running = False
+        if hasattr(self, 'serial'):
+            self.serial.close()
         if self.thread:
-            self.thread.join()
+            self.thread.join(timeout=1.0)
 
     def _read_serial(self):
         try:
@@ -59,4 +62,4 @@ class SerialHandler:
         try:
             return self.serial_queue.get_nowait()
         except queue.Empty:
-            return None 
+            return None
