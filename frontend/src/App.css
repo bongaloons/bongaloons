@@ -138,3 +138,45 @@
     animation: squiggly-anim 0.34s linear infinite;
   }
 }
+
+.rating {
+  unicode-bidi: bidi-override;
+  direction: rtl;
+  text-align: left;
+}
+
+.rating label {
+  display: inline-block;
+  position: relative;
+  width: 1.1em;
+  font-size: 2rem;
+  color: #ddd;
+  cursor: pointer;
+  transition: color 0.2s ease-in-out;
+}
+
+/* Base state of stars */
+.rating input:checked ~ label {
+  color: #ddd;
+}
+
+/* Selected state of stars */
+.rating input:checked + label,
+.rating input:checked + label ~ label {
+  color: #fb923c;
+}
+
+/* Hover state */
+.rating label:hover,
+.rating label:hover ~ label {
+  color: #fb923c !important;
+}
+
+/* Active state */
+.rating input:checked + label:hover,
+.rating input:checked + label:hover ~ label,
+.rating input:checked ~ label:hover,
+.rating input:checked ~ label:hover ~ label,
+.rating label:hover ~ input:checked ~ label {
+  color: #f97316 !important;
+}

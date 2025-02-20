@@ -5,13 +5,39 @@ from mido import Message, MidiFile, MidiTrack, MetaMessage, bpm2tempo
 MAX_NOTES = 500 # Default maximum notes in the final MIDI file
 
 
-def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES) -> float:
+def process_audio_to_midi(input_mp3, output_midi, difficulty=2) -> float:
+    """
+    Creates a MIDI beatmap from an MP3 file based on difficulty level (1-5).
+    Returns the detected BPM of the song.
+    
+    Difficulty levels determine notes per minute (NPM):
+    1 (Easy): ~30 NPM
+    2 (Normal): ~60 NPM
+    3 (Hard): ~90 NPM
+    4 (Expert): ~120 NPM
+    5 (Master): ~150 NPM
+    """
     # --- Step 1: Load the audio and determine BPM ---
-    # sr=None preserves the native sample rate.
     y, sr = librosa.load(input_mp3, sr=22050)
+    duration = librosa.get_duration(y=y, sr=sr)
+    # Add 2 seconds of padding at the end
+    padded_duration = duration + 2.0
     tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+    
+    # Convert numpy array to float if necessary
+    if isinstance(tempo, np.ndarray):
+        tempo = float(tempo[0])  # Take first value if it's an array
+    
     beat_times = librosa.frames_to_time(beat_frames, sr=sr)
-    print("Estimated BPM:", tempo)
+    print(f"Estimated BPM: {tempo:.2f}")
+    
+    # Calculate desired notes per minute based on difficulty
+    npm = difficulty * 30
+    target_notes = int((duration / 60) * npm)  # Use original duration for note calculation
+
+    # Ensure reasonable bounds (20-1000 notes)
+    max_notes = max(20, min(target_notes, 1000))
+    print(f"Targeting {max_notes} notes for difficulty {difficulty} ({npm} notes per minute)")
 
     # Calculate tempo-dependent tolerance (1/8 of the time between beats)
     beat_duration = 60.0 / tempo  # seconds per beat
@@ -57,7 +83,23 @@ def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES) -> float:
     
     # --- Step 3: Downsample if there are too many note events ---
     if len(events) > max_notes:
-        indices = np.linspace(0, len(events) - 1, num=max_notes, dtype=int)
+        # Use exponential distribution to favor keeping stronger onsets
+        strengths = np.array([e[2] for e in events])  # Get velocities
+        probs = strengths / strengths.sum()
+        
+        # If difficulty is higher, prefer to keep more complex patterns
+        if difficulty >= 4:
+            # For expert/master, keep more consecutive notes
+            indices = sorted(np.random.choice(
+                len(events), 
+                size=max_notes, 
+                p=probs, 
+                replace=False
+            ))
+        else:
+            # For easier difficulties, space out the notes more evenly
+            indices = np.linspace(0, len(events) - 1, num=max_notes, dtype=int)
+        
         events = [events[i] for i in indices]
         print(f"Downsampled events to {max_notes} total notes.")
 
@@ -88,8 +130,8 @@ def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES) -> float:
             duration = int((next_time - t) * ticks_per_second * 0.8)  # Use 80% of time to next event
             duration = max(duration, min_duration)  # Ensure minimum duration
         else:
-            # For the last event, use a fixed duration
-            duration = 120
+            # For the last event, use padded duration to ensure silence at the end
+            duration = int(2.0 * ticks_per_second)  # 2 seconds duration for last note
         
         for pitch in pitches:
             midi_messages.append((note_on_tick, Message('note_on', note=pitch, velocity=velocity, time=0)))
@@ -109,15 +151,15 @@ def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES) -> float:
     
     mid.save(output_midi)
     print(f"MIDI file saved as {output_midi}")
-    return tempo
+    return int(tempo)
 
 
 if __name__ == '__main__':
     import sys
     if len(sys.argv) < 3:
-        print("Usage: python make_beatmap.py input.mp3 output.mid [max_notes]")
+        print("Usage: python make_beatmap.py input.mp3 output.mid [difficulty]")
     else:
         input_mp3 = sys.argv[1]
         output_midi = sys.argv[2]
-        max_notes = int(sys.argv[3]) if len(sys.argv) > 3 else MAX_NOTES
-        process_audio_to_midi(input_mp3, output_midi, max_notes)
+        difficulty = int(sys.argv[3]) if len(sys.argv) > 3 else 2
+        process_audio_to_midi(input_mp3, output_midi, difficulty)

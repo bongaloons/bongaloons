@@ -7,7 +7,7 @@ import SquigglyText from './SquigglyText';
 export default function BeatmapUpload({onSubmit}: {onSubmit: () => void}) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [noteCount, setNoteCount] = useState<number>(100);
+  const [difficulty, setDifficulty] = useState<number>(2);
   const { startGame, setShowSongSelect } = useContext(GameContext);
 
   const handleSubmit = async () => {
@@ -18,7 +18,7 @@ export default function BeatmapUpload({onSubmit}: {onSubmit: () => void}) {
     formData.append('audio', file);
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/beatmap/create?max_notes=${noteCount}`, {
+      const response = await fetch(`http://127.0.0.1:8000/beatmap/create?difficulty=${difficulty}`, {
         method: 'POST',
         body: formData,
       });
@@ -28,7 +28,6 @@ export default function BeatmapUpload({onSubmit}: {onSubmit: () => void}) {
       }
 
       const data = await response.json();
-      // Instead of starting the game, close the upload form and let SongSelect refresh
       setShowSongSelect(true);
       onSubmit()
       
@@ -36,6 +35,17 @@ export default function BeatmapUpload({onSubmit}: {onSubmit: () => void}) {
       console.error('Error creating beatmap:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getDifficultyText = (diff: number) => {
+    switch (diff) {
+      case 1: return "Easy";
+      case 2: return "Normal";
+      case 3: return "Hard";
+      case 4: return "Expert";
+      case 5: return "Master";
+      default: return "Unknown";
     }
   };
 
@@ -71,22 +81,26 @@ export default function BeatmapUpload({onSubmit}: {onSubmit: () => void}) {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-xl font-display">Number of Notes</label>
+            <label className="text-xl font-display">Difficulty</label>
             <div className="flex items-center gap-4">
-              <input
-                type="range"
-                min="20"
-                max="1000"
-                value={noteCount}
-                onChange={(e) => setNoteCount(parseInt(e.target.value))}
-                className="range range-lg range-primary flex-1"
-              />
-              <span className="text-xl font-display w-20 text-center">
-                {noteCount}
+              <div className="rating">
+                <input type="radio" name="rating" value="5" id="rate5" onChange={() => setDifficulty(5)} checked={difficulty === 5} className="hidden" />
+                <label htmlFor="rate5">★</label>
+                <input type="radio" name="rating" value="4" id="rate4" onChange={() => setDifficulty(4)} checked={difficulty === 4} className="hidden" />
+                <label htmlFor="rate4">★</label>
+                <input type="radio" name="rating" value="3" id="rate3" onChange={() => setDifficulty(3)} checked={difficulty === 3} className="hidden" />
+                <label htmlFor="rate3">★</label>
+                <input type="radio" name="rating" value="2" id="rate2" onChange={() => setDifficulty(2)} checked={difficulty === 2} className="hidden" />
+                <label htmlFor="rate2">★</label>
+                <input type="radio" name="rating" value="1" id="rate1" onChange={() => setDifficulty(1)} checked={difficulty === 1} className="hidden" />
+                <label htmlFor="rate1">★</label>
+              </div>
+              <span className="text-xl font-display w-32">
+                {getDifficultyText(difficulty)}
               </span>
             </div>
             <div className="text-sm text-gray-600 mt-1">
-              More notes = higher difficulty. Recommended: 50-200 notes
+              Higher difficulty = more notes and complexity
             </div>
           </div>
           

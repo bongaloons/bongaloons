@@ -15,6 +15,7 @@ from models import (
     FallingDot,
     Song
 )
+import numpy as np
 from score import calculate_score
 from serial_handler import SerialHandler
 from redis_client import add_score, get_leaderboard
@@ -348,29 +349,16 @@ async def upload_video_segment(
 
 @app.post("/beatmap/create")
 async def create_beatmap(
-    max_notes: str,
+    difficulty: int,
     audio: UploadFile = File(...),
 ):
     """
     Creates a beatmap from an uploaded MP3 file.
+    Difficulty (1-5) is converted to appropriate number of notes based on song duration.
     Returns the generated MIDI file path and other metadata.
     """
-    print("Creating beatmap with max notes:", max_notes)
     os.makedirs("../frontend/public/uploads", exist_ok=True)
-    max_notes = int(max_notes)
     
-    difficulty = 1
-    if max_notes <= 50:
-        difficulty = 1
-    elif max_notes <= 100:
-        difficulty = 2
-    elif max_notes <= 150:
-        difficulty = 3
-    elif max_notes <= 200:
-        difficulty = 4
-    else:
-        difficulty = 5
-        
     timestamp = int(time.time())
     mp3_filename = f"upload_{timestamp}.mp3"
     midi_filename = f"upload_{timestamp}.mid"
@@ -384,7 +372,7 @@ async def create_beatmap(
             f.write(content)
             
         from make_beatmap import process_audio_to_midi
-        bpm = process_audio_to_midi(mp3_path, midi_path, max_notes)
+        bpm = process_audio_to_midi(mp3_path, midi_path, difficulty)
         
         song_name = audio.filename.rsplit('.', 1)[0] if audio.filename else f"Custom Song {timestamp}"
         
@@ -428,9 +416,10 @@ async def create_beatmap(
             "name": song_name,
             "path": f"/uploads/{midi_filename}",
             "song": f"/uploads/{mp3_filename}",
-            "bpm": int(bpm) if isinstance(bpm, (int, float)) else int(bpm[0]),
+            "bpm": int(float(bpm)) if isinstance(bpm, (int, float, np.ndarray)) else DEFAULT_BPM,
             "difficulty": difficulty
         }
+        
         
         # Remove any incomplete entries
         catalog = [entry for entry in catalog if isinstance(entry, dict) and all(
