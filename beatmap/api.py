@@ -2,14 +2,11 @@ import json
 import time
 import asyncio
 import os
+from game_state import start_new_game, process_hit as process_hit_state
 from fastapi import FastAPI, WebSocket, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from midi import (
-    parse_midi,
-    load_truth_note,
-    score_live_note,
     Note,
-    global_truth_map
 )
 from models import (
     GameStatusResponse,
@@ -52,10 +49,11 @@ GAME_STATE = {
     "songPath": "",             # Audio file path
     "midiPath": "",             # MIDI file path from the catalog
     "songName": "",             # Name of the song from the catalog
-    "bpm": 0,
+    "bpm": DEFAULT_BPM,
     "total_score": 0,
     "current_streak": 0,
-    "max_streak": 0
+    "max_streak": 0,
+    "session": None
 }
 
 serial_handler = SerialHandler()
@@ -109,76 +107,48 @@ async def get_songs() -> GetSongsResponse:
 
 @app.post("/game/start")
 async def start_game(id: int = 0):
-    # Get song info from catalog.json.
-    bpm, song_path, midi_path, song_name, difficulty = get_song_info_from_catalog(id)
-    GAME_STATE["bpm"] = bpm
-    GAME_STATE["songPath"] = song_path
-    GAME_STATE["midiPath"] = midi_path
-    GAME_STATE["songName"] = song_name
-    # Reset pause-related values.
-    GAME_STATE["is_paused"] = False
-    GAME_STATE["pause_timestamp"] = None
-    GAME_STATE["total_paused_time"] = 0
-
-    print(f"Using BPM: {bpm}, Song path: {song_path}, MIDI path: {midi_path}, Song name: {song_name}")
-
-    # Build the full MIDI path using the frontend public folder.
-    frontend_prefix = "../frontend/public/"
-    full_midi_path = f"{frontend_prefix}{midi_path.lstrip('/')}"
-    print("Full MIDI path:", full_midi_path)
-
-    truth_moves = parse_midi(full_midi_path)
-    global_truth_map.clear()
-    for move, notes in truth_moves.items():
-        for note in notes:
-            load_truth_note(move, note)
-
-    max_time = 0.0
-    for notes in truth_moves.values():
-        if notes:
-            max_time = max(max_time, notes[-1].start)
-    game_duration = max_time + 2.0
-    GAME_STATE["game_duration"] = game_duration
-    GAME_STATE["start_time"] = time.perf_counter()
-    GAME_STATE["is_running"] = True
-    GAME_STATE["total_score"] = 0
-    GAME_STATE["current_streak"] = 0
-    GAME_STATE["max_streak"] = 0
-
-    falling_dots = [
-        FallingDot(
-            move=move,
-            target_time=note.start * 1000,  # Convert to ms
-            track=move
-        )
-        for move, notes in truth_moves.items()
-        for note in notes
-    ]
-
-    print(notes)
-    
+    state, falling_dots, _ = start_new_game(id)
+    for field in state.__dict__.keys():
+        if field == 'session':
+            GAME_STATE['session'] = state.session
+        else:
+            GAME_STATE[field] = getattr(state, field)
     return {
         "status": "started",
-        "duration": game_duration,
+        "duration": state.game_duration,
         "falling_dots": falling_dots,
-        "songPath": song_path,
-        "midiPath": midi_path,
-        "songName": song_name,
-        "bpm": GAME_STATE["bpm"],
-        "difficulty": difficulty
+        "songPath": state.song_path,
+        "midiPath": state.midi_path,
+        "songName": state.song_name,
+        "bpm": state.bpm,
+        "difficulty": state.difficulty
     }
 
 async def process_hit(websocket: WebSocket, move: str, current_time: float):
     """Helper function to process a hit (from keyboard or serial)"""
+    if not GAME_STATE["session"]:
+        return
+        
     hit = Note(move_type=move, start=current_time, duration=0.0, subdivision=0)
-    judgement = score_live_note(move, current_time, hit, bpm=GAME_STATE["bpm"], threshold_fraction=1)
+    judgement = GAME_STATE["session"].score_live_note(
+        move, 
+        current_time, 
+        hit, 
+        threshold_fraction=1
+    )
+    
     score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
     GAME_STATE["total_score"] += score_delta
+    
     if judgement in ["MISS", "OOPS"]:
         GAME_STATE["current_streak"] = 0
     else:
         GAME_STATE["current_streak"] += 1
-        GAME_STATE["max_streak"] = max(GAME_STATE["max_streak"], GAME_STATE["current_streak"])
+        GAME_STATE["max_streak"] = max(
+            GAME_STATE["max_streak"], 
+            GAME_STATE["current_streak"]
+        )
+        
     await websocket.send_json({
         "type": "hit_registered",
         "move": move,
@@ -190,19 +160,32 @@ async def process_hit(websocket: WebSocket, move: str, current_time: float):
         "scoreDelta": score_delta
     })
 
+
 async def handle_game_over(websocket: WebSocket, current_time: float):
     """Helper function to handle game over state"""
-    for move in list(global_truth_map.keys()):
-        while global_truth_map[move]:
-            judgement = score_live_note(move, current_time, None, bpm=GAME_STATE["bpm"], threshold_fraction=1/8)
+    if not GAME_STATE["session"]:
+        return
+        
+    for move in list(GAME_STATE["session"].move_queues.keys()):
+        while GAME_STATE["session"].move_queues[move]:
+            judgement = GAME_STATE["session"].score_live_note(
+                move, 
+                current_time, 
+                None,
+                threshold_fraction=1
+            )
             if judgement == "MISS":
-                GAME_STATE["total_score"] += calculate_score(judgement, GAME_STATE["current_streak"])
+                score_delta = calculate_score(judgement, GAME_STATE["current_streak"])
+                GAME_STATE["total_score"] += score_delta
                 GAME_STATE["current_streak"] = 0
+                
     await websocket.send_json({
         "type": "game_over",
         "message": "Game over!",
         "totalScore": GAME_STATE["total_score"],
-        "scores": global_truth_map,
+        "scores": {
+            move: list(queue) for move, queue in GAME_STATE["session"].move_queues.items()
+        },
         "lastJudgement": None,
         "maxStreak": GAME_STATE["max_streak"]
     })
@@ -210,38 +193,32 @@ async def handle_game_over(websocket: WebSocket, current_time: float):
 
 
 async def game_status_checker(websocket: WebSocket):
-    """
-    Background task that continuously checks for missed notes and whether the game is over.
-    Only acts when the game is running and not paused.
-    """
+    """Background task that continuously checks for missed notes and game over state."""
     threshold_fraction = 1 / 2
     while True:
-        if not GAME_STATE["is_running"]:
-            await asyncio.sleep(0.05)
-            continue
-        if GAME_STATE["is_paused"]:
+        if not GAME_STATE["is_running"] or GAME_STATE["is_paused"] or not GAME_STATE["session"]:
             await asyncio.sleep(0.05)
             continue
             
         current_time = time.perf_counter() - GAME_STATE["start_time"] - GAME_STATE["total_paused_time"]
         
-        if GAME_STATE["is_running"]:
-            remaining_notes = sum(len(notes) for notes in global_truth_map.values())
-            print(f"Current time: {current_time:.2f}, Remaining notes: {remaining_notes}")
+        # Log remaining notes
+        remaining_notes = GAME_STATE["session"].get_remaining_notes()
+        print(f"Current time: {current_time:.2f}, Remaining notes: {remaining_notes}")
         
+        # Check for game duration exceeded
         if current_time >= GAME_STATE["game_duration"] + T_END:
             print(f"Game duration exceeded: {current_time:.2f} >= {GAME_STATE['game_duration'] + T_END:.2f}")
             await handle_game_over(websocket, current_time)
             break
             
         # Check for missed notes
-        for move in list(global_truth_map.keys()):
-            while global_truth_map.get(move):
-                judgement = score_live_note(
+        for move in list(GAME_STATE["session"].move_queues.keys()):
+            while GAME_STATE["session"].move_queues.get(move):
+                judgement = GAME_STATE["session"].score_live_note(
                     move,
                     current_time - T_FALL,
                     None,
-                    bpm=GAME_STATE["bpm"],
                     threshold_fraction=threshold_fraction
                 )
                 if judgement == "waiting":
@@ -256,11 +233,11 @@ async def game_status_checker(websocket: WebSocket):
                         "time": current_time - T_FALL,
                         "judgement": judgement,
                         "totalScore": GAME_STATE["total_score"],
-                        "currentStreak": GAME_STATE["current_streak"],
+                        "currentStreak": 0,
                     })
         
-        remaining_notes = sum(len(notes) for notes in global_truth_map.values())
-        if remaining_notes == 0 and GAME_STATE["is_running"] or current_time >= GAME_STATE["game_duration"] + T_END:
+        # Check if all notes are completed
+        if remaining_notes == 0 and GAME_STATE["is_running"]:
             print(f"All notes completed at time {current_time:.2f}")
             await handle_game_over(websocket, current_time)
             break
