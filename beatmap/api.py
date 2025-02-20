@@ -204,7 +204,6 @@ async def game_status_checker(websocket: WebSocket):
         
         # Log remaining notes
         remaining_notes = GAME_STATE["session"].get_remaining_notes()
-        print(f"Current time: {current_time:.2f}, Remaining notes: {remaining_notes}")
         
         # Check for game duration exceeded
         if current_time >= GAME_STATE["game_duration"] + T_END:
@@ -349,8 +348,8 @@ async def upload_video_segment(
 
 @app.post("/beatmap/create")
 async def create_beatmap(
+    max_notes: str,
     audio: UploadFile = File(...),
-    max_notes: str = "500"
 ):
     """
     Creates a beatmap from an uploaded MP3 file.

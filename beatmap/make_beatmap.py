@@ -13,10 +13,22 @@ def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES) -> float:
     beat_times = librosa.frames_to_time(beat_frames, sr=sr)
     print("Estimated BPM:", tempo)
 
-    
-    
+    # Calculate tempo-dependent tolerance (1/8 of the time between beats)
+    beat_duration = 60.0 / tempo  # seconds per beat
+    tol = beat_duration * 0.125   # 1/8 of a beat duration
+    print(f"Using tolerance: {tol:.3f} seconds")
+
+    # Add onset strength detection
     onset_frames = librosa.onset.onset_detect(y=y, sr=sr)
     onset_times = librosa.frames_to_time(onset_frames, sr=sr)
+    onset_strengths = librosa.onset.onset_strength(y=y, sr=sr)
+    
+    # Normalize onset strengths to MIDI velocity range (0-127)
+    onset_strengths = onset_strengths[onset_frames]
+    onset_velocities = np.clip(onset_strengths * 127 / onset_strengths.max(), 40, 127).astype(int)
+    
+    # Create a mapping of onset times to velocities
+    onset_velocity_map = dict(zip(onset_times, onset_velocities))
     
     # --- Step 2: Merge events and assign notes ---
     # Combine the beat times and onset times.
@@ -24,22 +36,24 @@ def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES) -> float:
     all_times.sort()
 
     events = []
-    tol = 0.05
     for t in all_times:
-        # Check if the time is close to a beat and/or an onset.
+        # Get velocity from nearby onset, or use default if not found
+        velocity = 64  # default velocity
+        for onset_time, onset_vel in onset_velocity_map.items():
+            if abs(t - onset_time) < tol:
+                velocity = onset_vel
+                break
+                
         is_beat = np.any(np.isclose(t, beat_times, atol=tol))
         is_onset = np.any(np.isclose(t, onset_times, atol=tol))
         
         if is_beat and is_onset:
-            # When both are present, output both notes simultaneously.
-            events.append((t, [67, 72]))
+            events.append((t, [67, 72], velocity))
         else:
-            # Otherwise, alternate between the two pitches.
-            # (You can change this strategy to suit your musical taste.)
             if len(events) % 2 == 0:
-                events.append((t, [67]))
+                events.append((t, [67], velocity))
             else:
-                events.append((t, [72]))
+                events.append((t, [72], velocity))
     
     # --- Step 3: Downsample if there are too many note events ---
     if len(events) > max_notes:
@@ -62,13 +76,24 @@ def process_audio_to_midi(input_mp3, output_midi, max_notes=MAX_NOTES) -> float:
     
     # Create a list for MIDI messages with absolute timing
     midi_messages = []
-    note_duration = 120  # Fixed duration in ticks
+    min_duration = 60  # Minimum duration in ticks to prevent very short notes
     
-    for t, pitches in events:
+    # Calculate note durations based on time to next event
+    for i, (t, pitches, velocity) in enumerate(events):
         note_on_tick = int(t * ticks_per_second)
+        
+        # Calculate duration based on time to next event
+        if i < len(events) - 1:
+            next_time = events[i + 1][0]
+            duration = int((next_time - t) * ticks_per_second * 0.8)  # Use 80% of time to next event
+            duration = max(duration, min_duration)  # Ensure minimum duration
+        else:
+            # For the last event, use a fixed duration
+            duration = 120
+        
         for pitch in pitches:
-            midi_messages.append((note_on_tick, Message('note_on', note=pitch, velocity=64, time=0)))
-            midi_messages.append((note_on_tick + note_duration, Message('note_off', note=pitch, velocity=64, time=0)))
+            midi_messages.append((note_on_tick, Message('note_on', note=pitch, velocity=velocity, time=0)))
+            midi_messages.append((note_on_tick + duration, Message('note_off', note=pitch, velocity=velocity, time=0)))
     
     # Sort messages by absolute tick, with note_on before note_off at same tick
     midi_messages.sort(key=lambda x: (x[0], 0 if x[1].type == 'note_on' else 1))
