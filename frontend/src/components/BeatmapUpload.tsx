@@ -4,7 +4,7 @@ import { GameContext } from '../context/GameContext';
 import PushButton from './PushButton';
 import SquigglyText from './SquigglyText';
 
-export default function BeatmapUpload() {
+export default function BeatmapUpload({onSubmit}: {onSubmit: () => void}) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [noteCount, setNoteCount] = useState<number>(100);
@@ -16,10 +16,9 @@ export default function BeatmapUpload() {
     setLoading(true);
     const formData = new FormData();
     formData.append('audio', file);
-    formData.append('max_notes', noteCount.toString());
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/beatmap/create', {
+      const response = await fetch(`http://127.0.0.1:8000/beatmap/create?max_notes=${noteCount}`, {
         method: 'POST',
         body: formData,
       });
@@ -31,6 +30,7 @@ export default function BeatmapUpload() {
       const data = await response.json();
       // Instead of starting the game, close the upload form and let SongSelect refresh
       setShowSongSelect(true);
+      onSubmit()
       
     } catch (error) {
       console.error('Error creating beatmap:', error);

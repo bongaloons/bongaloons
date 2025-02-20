@@ -1,8 +1,10 @@
 import pretty_midi
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Deque
 from score import Judgement
-
+from collections import deque
+from settings import T_FALL, FALL_DURATION
+import json
 # Mapping from MIDI pitch to move name.
 pitch_to_move = {67: "left", 72: "right", 79: "super"}
 
@@ -12,6 +14,12 @@ class Note:
     start: float
     duration: float
     subdivision: int  # e.g. 4 for quarter, 8 for eighth, etc.
+
+with open("../frontend/public/settings.json", "r") as f:
+    settings = json.load(f)
+
+DELAY_OFFSET = settings.get("delay", 0) / 1000
+REACTION_TIME = settings.get("reaction_time", 0) / 1000
 
 
 def get_note_subdivision(duration: float, bpm: float) -> int:
@@ -218,125 +226,81 @@ def score_beatmaps(
 
 ## REFERENCE METHOD ^^ ##
 
-global_truth_map: Dict[str, List[Note]] = {}
-
-def load_truth_note(move: str, note: Note) -> None:
-    """
-    Loads a single truth note into the global_truth_map for the specified move.
-    
-    If the move does not exist in the global_truth_map, it is created.
-    The note is inserted and the list is sorted by start time.
-    
-    :param move: A string representing the move (e.g., "left" or "right").
-    :param note: The Note object to load.
-    """
-    global global_truth_map
-    if move not in global_truth_map:
-        global_truth_map[move] = []
-    global_truth_map[move].append(note)
-    # Sort the list to ensure the earliest note is first.
-    global_truth_map[move].sort(key=lambda n: n.start)
-
-import json
-
-with open("../frontend/public/settings.json", "r") as f:
-    settings = json.load(f)
-
-DELAY_OFFSET = settings.get("delay", 0) / 1000
-REACTION_TIME = settings.get("reaction_time", 0) / 1000
-
-def score_live_note(
-    move: str,
-    current_time: float,
-    hit_note: Optional[Note],
-    bpm: float,
-    threshold_fraction: float = 1/8  # used for both early and late threshold
-) -> str:
-    """
-    Scores a live note for a given move.
-    
-    It refers to the global_truth_map to get the next scheduled truth note for the move.
-    
-    - If a hit note is provided:
-      * If the hit is too early (hit time < truth_note.start - threshold), returns "OOPS".
-      * If the hit is too late (hit time > truth_note.start + threshold), returns "MISS" and removes the truth note.
-      * Otherwise, it computes the time difference and grades it (e.g. "perfect late", "good early", etc.),
-        removes the truth note, and returns the judgement.
-        
-    - If no hit note is provided:
-      * If the current_time has passed truth_note.start + threshold, the truth note is missed,
-        it is removed and "MISS" is returned.
-      * Otherwise, returns "waiting".
-    
-    Note: Once a truth note is scored (hit or miss), it is removed from global_truth_map.
-    """
-    # If no truth notes remain for the move, we can't score
-    if move not in global_truth_map or not global_truth_map[move]:
-        # return "No scheduled note"
-        return Judgement.OOPS
-    
-    truth_note = global_truth_map[move][0]  # Get the earliest unsolved truth note.
-    quarter_duration = 60.0 / bpm
-    threshold = threshold_fraction * quarter_duration
-    
-    if hit_note is not None:
-        print(f"hit_note.start: {hit_note.start}, truth_note.start: {truth_note.start}, DELAY_OFFSET: {DELAY_OFFSET}")
-        diff = hit_note.start - (truth_note.start + DELAY_OFFSET + REACTION_TIME)
-        if diff < -threshold:
-            # Hit is too early.
-            return Judgement.OOPS
-        if diff > threshold:
-            # Hit is too late. Remove truth note as it's missed.
-            global_truth_map[move].pop(0)
-            return Judgement.MISS
-        
-        # Within acceptable window: compute ranking.
-        if diff == 0:
-            judgement = Judgement.PERFECT
-        else:
-            hit_type = "early" if diff < 0 else "late"
-            ratio = abs(diff) / threshold
-            if ratio < RANKING_THRESHOLDS[hit_type]["perfect"]:
-                rank = "perfect"
-            elif ratio < RANKING_THRESHOLDS[hit_type]["good"]:
-                rank = "good"
-            elif ratio < RANKING_THRESHOLDS[hit_type]["meh"]:
-                rank = "meh"
-            else:
-                rank = "bad"
+class BeatmapSession:
+    def __init__(self, truth_beatmap: Dict[str, List[Note]], bpm: float):
+        self.bpm = bpm
+        # Convert lists to deques for efficient popping from front
+        self.move_queues: Dict[str, Deque[Note]] = {}
+        for move, notes in truth_beatmap.items():
+            sorted_notes = sorted(notes, key=lambda n: n.start)
+            self.move_queues[move] = deque(sorted_notes)
             
-            if hit_type == "early":
-                if rank == "perfect":
-                    judgement = Judgement.PERFECT_EARLY
-                elif rank == "good":
-                    judgement = Judgement.GOOD_EARLY
-                elif rank == "meh":
-                    judgement = Judgement.MEH_EARLY
-                else:
-                    judgement = Judgement.BAD_EARLY
-            else:
-                if rank == "perfect":
-                    judgement = Judgement.PERFECT_LATE
-                elif rank == "good":
-                    judgement = Judgement.GOOD_LATE
-                elif rank == "meh":
-                    judgement = Judgement.MEH_LATE
-                else:
-                    judgement = Judgement.BAD_LATE
+    def get_remaining_notes(self) -> int:
+        """Return total number of remaining notes across all moves."""
+        return sum(len(q) for q in self.move_queues.values())
+    
+    def score_live_note(self, move: str, current_time: float, hit_note: Optional[Note], 
+                       threshold_fraction: float = 1/8) -> str:
+        """Score a live note hit."""
+        if move not in self.move_queues or not self.move_queues[move]:
+            return Judgement.OOPS
+            
+        front_note = self.move_queues[move][0]
+        quarter_duration = 60.0 / self.bpm
+        threshold = threshold_fraction * quarter_duration
         
-        # Remove the truth note since it has been scored.
-        global_truth_map[move].pop(0)
-        print(judgement)
-        return judgement
-    else:
-        # No hit note provided. Check if it's already past the acceptable window.
-        if current_time > truth_note.start + DELAY_OFFSET + threshold:
-            # Time is up for this note.
-            global_truth_map[move].pop(0)
-            print("past", truth_note.start, threshold)
-            return Judgement.MISS
+        if hit_note is not None:
+            # Compare hit time with truth note time, accounting for delay offset and reaction time
+            diff = hit_note.start - (front_note.start + DELAY_OFFSET + REACTION_TIME)
+            
+            if diff < -threshold:
+                return Judgement.OOPS
+            if diff > threshold:
+                self.move_queues[move].popleft()
+                return Judgement.MISS
+                
+            # Within threshold window - calculate precise judgement
+            ratio = abs(diff) / threshold
+            hit_type = "early" if diff < 0 else "late"
+            
+            if ratio < 0.2:  # Perfect window
+                judgement = Judgement.PERFECT
+            elif ratio < 0.5:  # Good window
+                judgement = (Judgement.GOOD_EARLY if hit_type == "early" 
+                           else Judgement.GOOD_LATE)
+            elif ratio < 0.8:  # Meh window
+                judgement = (Judgement.MEH_EARLY if hit_type == "early"
+                           else Judgement.MEH_LATE)
+            else:  # Bad window
+                judgement = (Judgement.BAD_EARLY if hit_type == "early"
+                           else Judgement.BAD_LATE)
+                
+            self.move_queues[move].popleft()
+            return judgement
+            
         else:
+            # For checking misses, account for delay offset
+            if current_time > front_note.start + DELAY_OFFSET + threshold:
+                self.move_queues[move].popleft()
+                return Judgement.MISS
             return "waiting"
+            
+    def check_misses(self, current_time: float, threshold_fraction: float = 1/8) -> List[tuple[str, Note, str]]:
+        """Check for missed notes across all moves."""
+        missed_notes = []
+        quarter_duration = 60.0 / self.bpm
+        threshold = threshold_fraction * quarter_duration
+        
+        for move, queue in self.move_queues.items():
+            while queue:
+                front_note = queue[0]
+                if current_time > front_note.start + threshold:
+                    missed_note = queue.popleft()
+                    missed_notes.append((move, missed_note, Judgement.MISS))
+                else:
+                    break
+                    
+        return missed_notes
 
 # Example usage:
 if __name__ == "__main__":

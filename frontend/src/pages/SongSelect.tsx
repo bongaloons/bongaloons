@@ -23,7 +23,7 @@ export default function SongSelect() {
         console.error('Error fetching songs:', err);
         setLoading(false);
       });
-  }, []);
+  }, [showUploadForm]);
 
   console.log("Loading", loading);
 
@@ -61,7 +61,7 @@ export default function SongSelect() {
       </div>
       {showUploadForm && (
         <div className="absolute top-0 left-0 w-screen h-screen bg-black/50 flex items-center justify-center">
-          <BeatmapUpload />
+          <BeatmapUpload onSubmit={() => setShowUploadForm(false)} />
         </div>
       )}
     </div>
