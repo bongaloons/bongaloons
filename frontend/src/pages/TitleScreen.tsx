@@ -7,6 +7,7 @@ import DvdLogo from "../components/cosmetics/DvdLogo";
 import Leaderboard from "../components/Leaderboard";
 import { clearAudio, playSoundFile } from '../utils/audioPlayer';
 import { getRandomOverlay } from "../utils/display";
+import Settings from "../components/Settings";
 
 const GIFS = [
     'gallery/cat-jump.gif',
@@ -27,13 +28,14 @@ export default function TitleScreen() {
     const [currentGif, setCurrentGif] = useState<string>(GIFS[0]);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
     const [audioUnlocked, setAudioUnlocked] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
 
     // Unlock audio playback on the first user interaction.
     useEffect(() => {
       const unlockAudio = () => {
         if (!audioUnlocked) {
           clearAudio()
-          playSoundFile('/sfx/title.ogg')
+          playSoundFile('/sfx/title.ogg', "song")
             .then(() => {
               setAudioUnlocked(true);
             })
@@ -193,7 +195,7 @@ export default function TitleScreen() {
                             >
                                 Start Game
                             </PushButton>
-                            <PushButton className="z-20">
+                            <PushButton className="z-20" onClick={() => setShowSettings(true)}>
                                 Settings
                             </PushButton>
                         </div>
@@ -228,6 +230,8 @@ export default function TitleScreen() {
                     <img src={currentGif} className="w-full" alt="Animated Content" />
                 )}
             </div>
+
+            {showSettings && <Settings onClose={() => setShowSettings(false)} />}
         </div>
     );
 }

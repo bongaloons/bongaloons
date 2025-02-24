@@ -294,7 +294,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
   const updatePoseBasedOnKeys = (pressedKeys: Set<string>) => {
     if (pressedKeys.has('a') || pressedKeys.has('l')) {
-      playSoundFile('/sfx/hit.ogg');
+      playSoundFile('/sfx/hit.ogg', 'sfx');
     }
 
     if (pressedKeys.has('a') && pressedKeys.has('l')) {

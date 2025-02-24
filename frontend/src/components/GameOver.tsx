@@ -34,7 +34,7 @@ export default function GameOver() {
 
   // Play the results audio on component mount
   useEffect(() => {
-    playSoundFile('/sfx/results.mp3', 0.2)
+    playSoundFile('/sfx/results.mp3', "song")
   }, []);
 
   const handleSubmitScore = async () => {

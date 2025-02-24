@@ -312,7 +312,7 @@ function Game() {
                 ws.send(JSON.stringify({ type: "toggle_pause" }))
               }
               // Play a sound effect on pause toggle
-              playSoundFile('/sfx/pause.ogg');
+              playSoundFile('/sfx/pause.ogg', 'sfx');
             }}
             className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 z-20 font-display text-xl inline-flex items-center gap-2"
           >

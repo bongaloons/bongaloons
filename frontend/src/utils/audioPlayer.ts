@@ -3,6 +3,7 @@
 let audioContext: AudioContext | null = null;
 const audioBufferCache: { [key: string]: AudioBuffer } = {};
 const activeSources: AudioBufferSourceNode[] = [];
+const activeGainNodes: GainNode[] = [];
 
 function getAudioContext(): AudioContext {
   if (!audioContext) {
@@ -23,36 +24,63 @@ export async function loadAudioBuffer(path: string): Promise<AudioBuffer> {
   return buffer;
 }
 
+export function getVolumeSettings() {
+  const saved = localStorage.getItem('volumeSettings');
+  const defaults = { master: 100, song: 100, sfx: 100 };
+  if (!saved) return defaults;
+  return JSON.parse(saved);
+}
+
+export function calculateVolume(type: 'song' | 'sfx'): number {
+  const settings = getVolumeSettings();
+  return (settings[type] / 100) * (settings.master / 100);
+}
+
+export function updateAllVolumes() {
+  const songVolume = calculateVolume('song');
+  const sfxVolume = calculateVolume('sfx');
+  
+  activeGainNodes.forEach((gainNode, index) => {
+    if (activeSources[index]) {
+      const type = activeSources[index].userData?.type || 'sfx';
+      gainNode.gain.value = type === 'song' ? songVolume : sfxVolume;
+    }
+  });
+}
+
 /**
  * Plays the specified sound file.
  * @param path - The path to the audio file.
- * @param volume - A number between 0 and 1 representing the volume (default is 1 for 100%).
+ * @param type - The type of sound (song or sfx).
  * @returns A promise resolving to the AudioBufferSourceNode playing the sound.
  */
-export async function playSoundFile(path: string, volume: number = 1): Promise<AudioBufferSourceNode> {
+export async function playSoundFile(path: string, type: 'song' | 'sfx' = 'sfx'): Promise<AudioBufferSourceNode> {
+  const volume = calculateVolume(type);
   const ctx = getAudioContext();
   const buffer = await loadAudioBuffer(path);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   
-  // Create a GainNode for volume control.
+  source.userData = { type };
+  
   const gainNode = ctx.createGain();
   gainNode.gain.value = volume;
   
-  // Connect the source to the gain node, then to the destination.
   source.connect(gainNode);
   gainNode.connect(ctx.destination);
   
   source.start(0);
   activeSources.push(source);
+  activeGainNodes.push(gainNode);
   
-  // Remove source from activeSources when finished.
   source.onended = () => {
     const index = activeSources.indexOf(source);
     if (index !== -1) {
       activeSources.splice(index, 1);
+      activeGainNodes.splice(index, 1);
     }
   };
+  
   return source;
 }
 

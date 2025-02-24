@@ -80,7 +80,7 @@ def start_new_game(song_id: int = 0) -> Tuple[GameState, List[FallingDot], List[
     for notes in truth_moves.values():
         if notes:
             max_time = max(max_time, notes[-1].start)
-    game_duration = max_time + 2.0
+    game_duration = max_time + 10.0
 
     # Create falling dots
     falling_dots = [
